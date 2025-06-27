@@ -147,59 +147,23 @@ export default function ReferenceInput({ formData, updateFormData }: ReferenceIn
             <h3 className="heading-3 text-black">
               Reference URLs
             </h3>
+            <span className="ml-2 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded font-semibold">Coming Soon</span>
           </div>
-          
-          <div className="flex gap-2">
+          <div className="flex gap-2 opacity-60 pointer-events-none select-none">
             <input
               type="url"
               value={newUrl}
-              onChange={(e) => setNewUrl(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Enter a URL..."
+              disabled
+              placeholder="URL reference support coming soon..."
               className="flex-1 input-field"
             />
             <button
-              onClick={addUrl}
-              disabled={!newUrl.trim()}
-              className="btn-primary px-3 disabled:opacity-50 disabled:cursor-not-allowed hover-lift"
+              disabled
+              className="btn-primary px-3 opacity-50 cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
             </button>
           </div>
-
-          {formData.references.urls.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="font-semibold text-black text-sm">
-                Added URLs ({formData.references.urls.length})
-              </h4>
-              <div className="grid grid-cols-1 gap-2">
-                {formData.references.urls.map((url, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div className="flex items-center flex-1 min-w-0">
-                      <Link className="w-3 h-3 text-gray-500 mr-2 flex-shrink-0" />
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-medium text-blue-600 hover:text-blue-800 text-sm truncate"
-                      >
-                        {url}
-                      </a>
-                    </div>
-                    <button
-                      onClick={() => removeUrl(index)}
-                      className="text-gray-400 hover:text-black transition-colors p-1 rounded-full hover:bg-gray-200 ml-2 flex-shrink-0"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Custom Text */}

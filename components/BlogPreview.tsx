@@ -7,19 +7,119 @@ interface BlogPreviewProps {
   content: BlogContent & { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } }
 }
 
+function parseMarkdown(text: string) {
+  // Inline code
+  text = text.replace(/`([^`]+)`/g, '<code>$1</code>')
+  // Bold-italic
+  text = text.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
+  // Bold
+  text = text.replace(/(\*\*|__)(.*?)\1/g, '<strong>$2</strong>')
+  // Italic
+  text = text.replace(/(\*|_)([^*_]+)\1/g, '<em>$2</em>')
+  // Links
+  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+  return text
+}
+
 function renderBody(body: string[] | string) {
   const lines = Array.isArray(body) ? body : [body]
-  return lines.map((line, idx) => {
-    if (line.trim().startsWith('### ')) {
-      return <h3 key={idx} className="text-base font-semibold mt-6 mb-2 text-gray-800">{line.replace(/^### /, '')}</h3>
-    } else if (line.trim().startsWith('## ')) {
-      return <h2 key={idx} className="text-xl font-bold mt-8 mb-3 text-gray-900">{line.replace(/^## /, '')}</h2>
-    } else if (line.trim()) {
-      return <p key={idx} className="text-base text-gray-900 leading-relaxed mb-3">{line}</p>
-    } else {
-      return null
+  const elements: React.ReactNode[] = []
+  let listType: 'ol' | 'ul' | null = null
+  let listItems: React.ReactNode[] = []
+  let inCodeBlock = false
+  let codeBlockLines: string[] = []
+
+  const flushList = () => {
+    if (listType && listItems.length > 0) {
+      elements.push(
+        listType === 'ol' ? <ol className="list-decimal ml-6 mb-3" key={elements.length}>{listItems}</ol>
+                         : <ul className="list-disc ml-6 mb-3" key={elements.length}>{listItems}</ul>
+      )
+      listType = null
+      listItems = []
     }
+  }
+  const flushCodeBlock = () => {
+    if (inCodeBlock && codeBlockLines.length > 0) {
+      elements.push(
+        <pre key={elements.length} className="bg-gray-100 rounded p-3 mb-3 overflow-x-auto"><code>{codeBlockLines.join('\n')}</code></pre>
+      )
+      codeBlockLines = []
+      inCodeBlock = false
+    }
+  }
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim()
+    // Code block start/end
+    if (/^```/.test(trimmed)) {
+      if (!inCodeBlock) {
+        inCodeBlock = true
+        codeBlockLines = []
+      } else {
+        flushCodeBlock()
+      }
+      return
+    }
+    if (inCodeBlock) {
+      codeBlockLines.push(line)
+      return
+    }
+    // Horizontal rule
+    if (/^(---|\*\*\*|___)$/.test(trimmed)) {
+      flushList(); flushCodeBlock()
+      elements.push(<hr key={idx} className="my-4" />)
+      return
+    }
+    // Blockquote
+    if (/^> /.test(trimmed)) {
+      flushList(); flushCodeBlock()
+      elements.push(<blockquote key={idx} className="border-l-4 border-blue-400 pl-4 italic text-gray-700 mb-3">{parseMarkdown(trimmed.replace(/^> /, ''))}</blockquote>)
+      return
+    }
+    // Numbered list
+    if (/^\d+\. /.test(trimmed)) {
+      flushCodeBlock()
+      if (listType !== 'ol') flushList()
+      listType = 'ol'
+      listItems.push(<li key={idx} className="mb-1" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^\d+\.\s*/, ''))}} />)
+      return
+    }
+    // Bulleted list
+    if (/^[-*] /.test(trimmed)) {
+      flushCodeBlock()
+      if (listType !== 'ul') flushList()
+      listType = 'ul'
+      listItems.push(<li key={idx} className="mb-1" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^[-*]\s*/, ''))}} />)
+      return
+    }
+    // Headings
+    if (trimmed.startsWith('### ')) {
+      flushList(); flushCodeBlock()
+      elements.push(<h3 key={idx} className="text-base font-semibold mt-6 mb-2 text-gray-800" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^### /, ''))}} />)
+      return
+    }
+    if (trimmed.startsWith('## ')) {
+      flushList(); flushCodeBlock()
+      elements.push(<h2 key={idx} className="text-xl font-bold mt-8 mb-3 text-gray-900" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^## /, ''))}} />)
+      return
+    }
+    if (trimmed.startsWith('# ')) {
+      flushList(); flushCodeBlock()
+      elements.push(<h1 key={idx} className="text-2xl font-bold mt-10 mb-4 text-black" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^# /, ''))}} />)
+      return
+    }
+    // Paragraph
+    if (trimmed) {
+      flushList(); flushCodeBlock()
+      elements.push(<p key={idx} className="text-base text-gray-900 leading-relaxed mb-3" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed)}} />)
+      return
+    }
+    // Blank line
+    flushList(); flushCodeBlock()
   })
+  flushList(); flushCodeBlock()
+  return elements
 }
 
 function getPlainText(content: BlogContent) {
@@ -34,6 +134,10 @@ function getPlainText(content: BlogContent) {
       result += `${line.replace(/^### /, '')}\n\n`
     } else if (line.trim().startsWith('## ')) {
       result += `${line.replace(/^## /, '')}\n\n`
+    } else if (/^\d+\. /.test(line.trim())) {
+      result += `${line.trim()}\n`
+    } else if (/^[-*] /.test(line.trim())) {
+      result += `${line.trim()}\n`
     } else if (line.trim()) {
       result += `${line}\n\n`
     }
