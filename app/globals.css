@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: #ffffff;
+    color: #000000;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  /* Uber-inspired Button Styles */
+  .btn-primary {
+    @apply bg-black text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 hover:bg-gray-800 active:scale-95 transform text-sm;
+  }
+  
+  .btn-secondary {
+    @apply bg-transparent text-black border border-gray-300 font-medium py-2.5 px-4 rounded-lg transition-all duration-200 hover:bg-gray-50 active:scale-95 transform text-sm;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent text-black font-medium py-2.5 px-4 rounded-lg transition-all duration-200 hover:bg-gray-50 active:scale-95 transform text-sm;
+  }
+  
+  /* Uber-inspired Input Styles */
+  .input-field {
+    @apply w-full px-3 py-2.5 bg-white text-black border border-gray-300 rounded-lg font-normal text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition-all duration-200 placeholder:text-gray-400;
+  }
+  
+  /* Uber-inspired Card Styles */
+  .card {
+    @apply bg-white text-black rounded-lg p-4 shadow-sm border border-gray-200;
+  }
+  
+  .card-dark {
+    @apply bg-gray-50 text-black border border-gray-200 rounded-lg p-4;
+  }
+  
+  /* Uber-inspired Sidebar */
+  .sidebar {
+    @apply bg-gray-50 border-r border-gray-200 p-4 overflow-y-auto;
+  }
+
+  /* Uber-inspired Typography */
+  .heading-1 {
+    @apply text-3xl font-bold leading-tight;
+  }
+
+  .heading-2 {
+    @apply text-2xl font-semibold leading-tight;
+  }
+
+  .heading-3 {
+    @apply text-lg font-semibold leading-tight;
+  }
+
+  .body-text {
+    @apply text-sm font-normal leading-relaxed;
+  }
+
+  .caption {
+    @apply text-xs font-medium text-gray-500;
+  }
+
+  /* Uber-inspired Animations */
+  .fade-in {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  /* Uber-inspired Hover Effects */
+  .hover-lift {
+    @apply transition-all duration-200 hover:transform hover:scale-105 hover:shadow-md;
+  }
+
+  .hover-glow {
+    @apply transition-all duration-200 hover:shadow-lg;
+  }
+}
+
+@layer utilities {
+  /* Custom Animations */
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { 
+      opacity: 0; 
+      transform: translateY(10px); 
+    }
+    to { 
+      opacity: 1; 
+      transform: translateY(0); 
+    }
+  }
+
+  @keyframes scaleIn {
+    from { 
+      opacity: 0; 
+      transform: scale(0.98); 
+    }
+    to { 
+      opacity: 1; 
+      transform: scale(1); 
+    }
+  }
+
+  /* Uber-inspired Gradients */
+  .gradient-text {
+    @apply bg-gradient-to-r from-black to-gray-600 bg-clip-text text-transparent;
+  }
+
+  /* Uber-inspired Shadows */
+  .shadow-uber {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .shadow-uber-light {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  }
+} 
