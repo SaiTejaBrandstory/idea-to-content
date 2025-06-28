@@ -1,186 +1,113 @@
 'use client'
 
 import { BlogContent } from '@/types/blog'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import toast from 'react-hot-toast'
 
 interface BlogPreviewProps {
   content: BlogContent & { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } }
 }
 
-function parseMarkdown(text: string) {
-  // Inline code
-  text = text.replace(/`([^`]+)`/g, '<code>$1</code>')
-  // Bold-italic
-  text = text.replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
-  // Bold
-  text = text.replace(/(\*\*|__)(.*?)\1/g, '<strong>$2</strong>')
-  // Italic
-  text = text.replace(/(\*|_)([^*_]+)\1/g, '<em>$2</em>')
-  // Links
-  text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-  return text
+const markdownComponents = {
+  h1: ({node, ...props}: any) => <h1 className="text-2xl font-bold mb-4 text-black" {...props} />,
+  h2: ({node, ...props}: any) => <h2 className="text-xl font-bold mt-8 mb-3 text-gray-900" {...props} />,
+  h3: ({node, ...props}: any) => <h3 className="text-base font-bold mt-6 mb-2 text-gray-800" {...props} />,
+  p: ({node, ...props}: any) => <p className="text-base text-gray-900 leading-relaxed mb-3" {...props} />,
+  ul: ({node, ...props}: any) => <ul className="list-disc ml-6 mb-3" {...props} />,
+  ol: ({node, ...props}: any) => <ol className="list-decimal ml-6 mb-3" {...props} />,
+  li: ({node, ...props}: any) => <li className="mb-1" {...props} />,
+  blockquote: ({node, ...props}: any) => <blockquote className="border-l-4 border-blue-400 pl-4 italic text-gray-700 mb-3" {...props} />,
+  code: ({node, ...props}: any) => <code className="bg-gray-100 px-1 rounded" {...props} />,
 }
 
-function renderBody(body: string[] | string) {
-  const lines = Array.isArray(body) ? body : [body]
-  const elements: React.ReactNode[] = []
-  let listType: 'ol' | 'ul' | null = null
-  let listItems: React.ReactNode[] = []
-  let inCodeBlock = false
-  let codeBlockLines: string[] = []
-
-  const flushList = () => {
-    if (listType && listItems.length > 0) {
-      elements.push(
-        listType === 'ol' ? <ol className="list-decimal ml-6 mb-3" key={elements.length}>{listItems}</ol>
-                         : <ul className="list-disc ml-6 mb-3" key={elements.length}>{listItems}</ul>
-      )
-      listType = null
-      listItems = []
-    }
-  }
-  const flushCodeBlock = () => {
-    if (inCodeBlock && codeBlockLines.length > 0) {
-      elements.push(
-        <pre key={elements.length} className="bg-gray-100 rounded p-3 mb-3 overflow-x-auto"><code>{codeBlockLines.join('\n')}</code></pre>
-      )
-      codeBlockLines = []
-      inCodeBlock = false
-    }
-  }
-
-  lines.forEach((line, idx) => {
-    const trimmed = line.trim()
-    // Code block start/end
-    if (/^```/.test(trimmed)) {
-      if (!inCodeBlock) {
-        inCodeBlock = true
-        codeBlockLines = []
-      } else {
-        flushCodeBlock()
-      }
-      return
-    }
-    if (inCodeBlock) {
-      codeBlockLines.push(line)
-      return
-    }
-    // Horizontal rule
-    if (/^(---|\*\*\*|___)$/.test(trimmed)) {
-      flushList(); flushCodeBlock()
-      elements.push(<hr key={idx} className="my-4" />)
-      return
-    }
-    // Blockquote
-    if (/^> /.test(trimmed)) {
-      flushList(); flushCodeBlock()
-      elements.push(<blockquote key={idx} className="border-l-4 border-blue-400 pl-4 italic text-gray-700 mb-3">{parseMarkdown(trimmed.replace(/^> /, ''))}</blockquote>)
-      return
-    }
-    // Numbered list
-    if (/^\d+\. /.test(trimmed)) {
-      flushCodeBlock()
-      if (listType !== 'ol') flushList()
-      listType = 'ol'
-      listItems.push(<li key={idx} className="mb-1" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^\d+\.\s*/, ''))}} />)
-      return
-    }
-    // Bulleted list
-    if (/^[-*] /.test(trimmed)) {
-      flushCodeBlock()
-      if (listType !== 'ul') flushList()
-      listType = 'ul'
-      listItems.push(<li key={idx} className="mb-1" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^[-*]\s*/, ''))}} />)
-      return
-    }
-    // Headings
-    if (trimmed.startsWith('### ')) {
-      flushList(); flushCodeBlock()
-      elements.push(<h3 key={idx} className="text-base font-semibold mt-6 mb-2 text-gray-800" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^### /, ''))}} />)
-      return
-    }
-    if (trimmed.startsWith('## ')) {
-      flushList(); flushCodeBlock()
-      elements.push(<h2 key={idx} className="text-xl font-bold mt-8 mb-3 text-gray-900" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^## /, ''))}} />)
-      return
-    }
-    if (trimmed.startsWith('# ')) {
-      flushList(); flushCodeBlock()
-      elements.push(<h1 key={idx} className="text-2xl font-bold mt-10 mb-4 text-black" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed.replace(/^# /, ''))}} />)
-      return
-    }
-    // Paragraph
-    if (trimmed) {
-      flushList(); flushCodeBlock()
-      elements.push(<p key={idx} className="text-base text-gray-900 leading-relaxed mb-3" dangerouslySetInnerHTML={{__html: parseMarkdown(trimmed)}} />)
-      return
-    }
-    // Blank line
-    flushList(); flushCodeBlock()
-  })
-  flushList(); flushCodeBlock()
-  return elements
+interface HumanizedContent {
+  output: string;
+  new_flesch_score: number;
 }
 
-function getPlainText(content: BlogContent) {
-  let result = ''
-  result += `Meta Title: ${content.title}\n\n`
-  result += `Meta Description: ${content.metaDescription}\n\n`
-  result += `${content.title}\n\n`
-  result += `${content.intro}\n\n`
-  const bodyLines = Array.isArray(content.body) ? content.body : [content.body]
-  for (const line of bodyLines) {
-    if (line.trim().startsWith('### ')) {
-      result += `${line.replace(/^### /, '')}\n\n`
-    } else if (line.trim().startsWith('## ')) {
-      result += `${line.replace(/^## /, '')}\n\n`
-    } else if (/^\d+\. /.test(line.trim())) {
-      result += `${line.trim()}\n`
-    } else if (/^[-*] /.test(line.trim())) {
-      result += `${line.trim()}\n`
-    } else if (line.trim()) {
-      result += `${line}\n\n`
-    }
-  }
-  result += `${content.conclusion}\n\n`
-  if (content.cta) {
-    result += `Call to Action: ${content.cta}\n\n`
-  }
-  return result.trim()
-}
+const getFleschScoreColor = (score: number) => {
+  if (score >= 80) return 'bg-green-500';
+  if (score >= 60) return 'bg-blue-500';
+  if (score >= 40) return 'bg-yellow-500';
+  return 'bg-red-500';
+};
 
-function getCost(usage?: { prompt_tokens?: number; completion_tokens?: number }) {
-  if (!usage) return null
-  // GPT-4o pricing as of June 2024: $0.005/1K input, $0.015/1K output
-  const input = usage.prompt_tokens || 0
-  const output = usage.completion_tokens || 0
-  const inputCost = (input / 1000) * 0.005
-  const outputCost = (output / 1000) * 0.015
-  const total = inputCost + outputCost
-  if (total > 0) {
-    const inr = total * 83
-    return `$${total.toFixed(4)} USD (₹${inr.toFixed(2)} INR)`
-  }
-  return null
-}
+const getFleschScoreLabel = (score: number) => {
+  if (score >= 80) return 'Very Easy';
+  if (score >= 60) return 'Easy';
+  if (score >= 40) return 'Medium';
+  return 'Difficult';
+};
 
 export default function BlogPreview({ content }: BlogPreviewProps) {
+  const [isHumanizing, setIsHumanizing] = useState(false);
+  const [humanizedContent, setHumanizedContent] = useState<HumanizedContent | null>(null);
+  const [isRehumanizing, setIsRehumanizing] = useState(false);
+
   // Calculate word count
   const wordCount = useMemo(() => {
     const allText = [content.intro, ...(Array.isArray(content.body) ? content.body : [content.body]), content.conclusion, content.cta || ''].join(' ')
     return allText.split(/\s+/).filter(Boolean).length
   }, [content])
 
+  // Cost calculation (unchanged)
+  const getCost = (usage?: { prompt_tokens?: number; completion_tokens?: number }) => {
+    if (!usage) return null
+    const input = usage.prompt_tokens || 0
+    const output = usage.completion_tokens || 0
+    const inputCost = (input / 1000) * 0.005
+    const outputCost = (output / 1000) * 0.015
+    const total = inputCost + outputCost
+    if (total > 0) {
+      const inr = total * 83
+      return `$${total.toFixed(4)} USD (₹${inr.toFixed(2)} INR)`
+    }
+    return null
+  }
   const cost = getCost(content.usage)
 
+  // Humanize the content
+  const humanizeContent = async (text: string, isRehumanize = false) => {
+    try {
+      if (isRehumanize) {
+        setIsRehumanizing(true);
+      } else {
+        setIsHumanizing(true);
+      }
+
+      const response = await fetch('/api/humanize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to humanize content');
+      }
+
+      const data = await response.json();
+      setHumanizedContent(data);
+      toast.success(isRehumanize ? 'Content rehumanized!' : 'Content humanized!');
+    } catch (error) {
+      toast.error('Failed to humanize content');
+      console.error('Humanization error:', error);
+    } finally {
+      setIsHumanizing(false);
+      setIsRehumanizing(false);
+    }
+  };
+
   // Download as TXT with proper line breaks
-  const downloadBlog = () => {
-    const blogText = getPlainText(content)
+  const downloadBlog = (text: string, prefix: string = '') => {
+    const blogText = `${text}`.trim()
     const blob = new Blob([blogText], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${content.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`
+    a.download = `${prefix}${content.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -188,13 +115,25 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
   }
 
   // Copy to clipboard with proper line breaks
-  const copyToClipboard = async () => {
+  const copyToClipboard = async (text: string) => {
     try {
-      await navigator.clipboard.writeText(getPlainText(content))
+      await navigator.clipboard.writeText(text)
+      toast.success('Copied to clipboard!');
     } catch (err) {
       console.error('Failed to copy text: ', err)
+      toast.error('Failed to copy text');
     }
   }
+
+  // Get the full blog text for humanization
+  const getFullBlogText = () => {
+    return `${content.intro}\n\n${Array.isArray(content.body) ? content.body.join('\n\n') : content.body}\n\n${content.conclusion}`.trim();
+  };
+
+  // Get formatted blog text with meta info
+  const getFormattedBlogText = () => {
+    return `Meta Title: ${content.title}\n\nMeta Description: ${content.metaDescription}\n\n${content.title}\n\n${content.intro}\n\n${Array.isArray(content.body) ? content.body.join('\n\n') : content.body}\n\n${content.conclusion}\n\n${content.cta ? `Call to Action: ${content.cta}\n\n` : ''}`.trim();
+  };
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 bg-white">
@@ -215,20 +154,23 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
       {/* Blog Title */}
       <h1 className="text-2xl font-bold mb-6 text-black">{content.title}</h1>
 
-      {/* Intro */}
-      <section className="mb-5">
-        <p className="text-base text-gray-900 leading-relaxed mb-3">{content.intro}</p>
-      </section>
+      {/* Original Content */}
+      <div>
+        {/* Intro */}
+        <section className="mb-5">
+          <ReactMarkdown components={markdownComponents}>{content.intro}</ReactMarkdown>
+        </section>
 
-      {/* Body Paragraphs & Headings */}
-      <section className="mb-5">
-        {renderBody(content.body)}
-      </section>
+        {/* Body Paragraphs & Headings */}
+        <section className="mb-5">
+          <ReactMarkdown components={markdownComponents}>{Array.isArray(content.body) ? content.body.join('\n\n') : content.body}</ReactMarkdown>
+        </section>
 
-      {/* Conclusion */}
-      <section className="mb-5">
-        <p className="text-base text-gray-900 leading-relaxed mb-3 font-semibold">{content.conclusion}</p>
-      </section>
+        {/* Conclusion */}
+        <section className="mb-5">
+          <ReactMarkdown components={markdownComponents}>{content.conclusion}</ReactMarkdown>
+        </section>
+      </div>
 
       {/* CTA */}
       {content.cta && (
@@ -239,21 +181,71 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
         </section>
       )}
 
-      {/* Export Options */}
+      {/* Action Buttons */}
       <div className="flex gap-2 pt-4 border-t border-gray-200 mt-8">
         <button
-          onClick={downloadBlog}
+          onClick={() => downloadBlog(getFormattedBlogText())}
           className="btn-primary px-4 py-2 text-xs hover-lift"
         >
           Download TXT
         </button>
         <button
-          onClick={copyToClipboard}
+          onClick={() => copyToClipboard(getFormattedBlogText())}
           className="btn-secondary px-4 py-2 text-xs hover-lift"
         >
           Copy All
         </button>
+        <button
+          onClick={() => humanizeContent(getFullBlogText())}
+          disabled={isHumanizing}
+          className="px-4 py-2 text-xs hover-lift disabled:opacity-50 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition-colors duration-150"
+        >
+          {isHumanizing ? 'Humanizing...' : 'Humanize'}
+        </button>
       </div>
+
+      {/* Humanized Content */}
+      {humanizedContent && (
+        <div className="mt-8 pt-8 border-t-2 border-gray-100">
+          <div className="flex items-center gap-4 mb-4">
+            <h2 className="text-lg font-semibold text-blue-900">Humanized Version</h2>
+            <div className="flex items-center gap-2">
+              <div className="text-sm text-gray-600">Flesch Score:</div>
+              <div className="flex items-center gap-1">
+                <div className={`w-2 h-2 rounded-full ${getFleschScoreColor(humanizedContent.new_flesch_score)}`}></div>
+                <div className="text-sm font-medium">{humanizedContent.new_flesch_score.toFixed(1)}</div>
+                <div className="text-xs text-gray-500">({getFleschScoreLabel(humanizedContent.new_flesch_score)})</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="prose max-w-none p-6 rounded-xl bg-blue-50 border border-blue-100">
+            <ReactMarkdown components={markdownComponents}>{humanizedContent.output}</ReactMarkdown>
+          </div>
+          
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => downloadBlog(humanizedContent.output, 'humanized_')}
+              className="btn-primary px-4 py-2 text-xs hover-lift"
+            >
+              Download TXT
+            </button>
+            <button
+              onClick={() => copyToClipboard(humanizedContent.output)}
+              className="btn-secondary px-4 py-2 text-xs hover-lift"
+            >
+              Copy
+            </button>
+            <button
+              onClick={() => humanizeContent(humanizedContent.output, true)}
+              disabled={isRehumanizing}
+              className="px-4 py-2 text-xs hover-lift disabled:opacity-50 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors duration-150"
+            >
+              {isRehumanizing ? 'Rehumanizing...' : 'Rehumanize'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 

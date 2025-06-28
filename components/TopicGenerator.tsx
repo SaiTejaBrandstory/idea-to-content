@@ -13,6 +13,7 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedTitles, setGeneratedTitles] = useState<string[]>([])
   const [error, setError] = useState('')
+  const [cost, setCost] = useState<string | null>(null)
 
   const emphasisTypes = [
     'Keyword Emphasis',
@@ -40,7 +41,6 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
         body: JSON.stringify({
           keywords: formData.keywords,
           blogType: formData.blogType,
-          emphasisTypes,
         }),
       })
 
@@ -50,6 +50,21 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
 
       const data = await response.json()
       setGeneratedTitles((data.titles || []).map((t: any) => typeof t === 'string' ? t : t.title))
+      if (data.usage) {
+        const input = data.usage.prompt_tokens || 0
+        const output = data.usage.completion_tokens || 0
+        const inputCost = (input / 1000) * 0.005
+        const outputCost = (output / 1000) * 0.015
+        const total = inputCost + outputCost
+        if (total > 0) {
+          const inr = total * 83
+          setCost(`$${total.toFixed(4)} USD (₹${inr.toFixed(2)} INR)`)
+        } else {
+          setCost(null)
+        }
+      } else {
+        setCost(null)
+      }
     } catch (error) {
       console.error('Error generating titles:', error)
       setError('Failed to generate titles. Please try again.')
@@ -125,6 +140,9 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
         {/* Generated Titles */}
         {generatedTitles.length > 0 && (
           <div className="space-y-4">
+            {cost && (
+              <div className="mb-2 text-xs text-gray-500 font-medium">Cost: {cost}</div>
+            )}
             <div className="flex items-center justify-between">
               <h3 className="heading-3 text-black">
                 Generated Titles ({generatedTitles.length})

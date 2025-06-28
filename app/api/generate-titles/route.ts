@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
-import { GeneratedTitle } from '@/types/blog'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -8,7 +7,7 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { keywords, blogType, emphasisTypes } = await request.json()
+    const { keywords, blogType } = await request.json()
 
     if (!keywords || keywords.length === 0) {
       return NextResponse.json(
@@ -24,19 +23,33 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const prompt = `Generate 5 blog titles for a ${blogType} blog post using these keywords: ${keywords.join(', ')}.
+    // Blog type specific instruction
+    let typeInstruction = ''
+    switch (blogType) {
+      case 'Listicle':
+        typeInstruction = 'Generate titles suitable for a numbered listicle blog post.'
+        break
+      case 'How-to':
+        typeInstruction = 'Generate titles suitable for a step-by-step how-to blog post.'
+        break
+      case 'Case Study':
+        typeInstruction = 'Generate titles suitable for a real-world case study blog post.'
+        break
+      case 'Solution-based':
+        typeInstruction = 'Generate titles suitable for a problem-solving, solution-based blog post.'
+        break
+      case 'Informative':
+      default:
+        typeInstruction = 'Generate titles suitable for an educational and comprehensive informative blog post.'
+    }
 
-For each title, use a different emphasis style:
-${emphasisTypes.map((type: string, index: number) => `${index + 1}. ${type}`).join('\n')}
+    const prompt = `Generate 5 engaging, SEO-friendly blog titles for a ${blogType} blog post using these keywords: ${keywords.join(', ')}. ${typeInstruction}
 
 Requirements:
-- Each title should be engaging and SEO-friendly
+- Each title should be compelling and click-worthy
 - Include the main keywords naturally
-- Make titles compelling and click-worthy
 - Keep titles under 60 characters
-- Return only the titles, one per line
-
-Format your response as a simple list of titles, one per line.`
+- Return only the titles, one per line`
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -69,30 +82,22 @@ Format your response as a simple list of titles, one per line.`
       throw new Error('No valid titles generated')
     }
 
-    const generatedTitles: GeneratedTitle[] = titles.map((title, index) => ({
-      title,
-      emphasis: emphasisTypes[index] || 'Hybrid Emphasis'
-    }))
-
-    return NextResponse.json({ titles: generatedTitles })
+    const usage = completion.usage || null
+    return NextResponse.json({ titles, usage })
   } catch (error: any) {
     console.error('Error generating titles:', error)
-    
-    // Handle specific OpenAI errors
     if (error?.status === 401) {
       return NextResponse.json(
         { error: 'Invalid OpenAI API key. Please check your configuration.' },
         { status: 401 }
       )
     }
-    
     if (error?.status === 429) {
       return NextResponse.json(
         { error: 'Rate limit exceeded. Please try again later.' },
         { status: 429 }
       )
     }
-
     return NextResponse.json(
       { error: 'Failed to generate titles. Please try again.' },
       { status: 500 }
