@@ -43,7 +43,6 @@ const getFleschScoreLabel = (score: number) => {
 export default function BlogPreview({ content }: BlogPreviewProps) {
   const [isHumanizing, setIsHumanizing] = useState(false);
   const [humanizedContent, setHumanizedContent] = useState<HumanizedContent | null>(null);
-  const [isRehumanizing, setIsRehumanizing] = useState(false);
 
   // Calculate word count
   const wordCount = useMemo(() => {
@@ -68,13 +67,9 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
   const cost = getCost(content.usage)
 
   // Humanize the content
-  const humanizeContent = async (text: string, isRehumanize = false) => {
+  const humanizeContent = async (text: string) => {
     try {
-      if (isRehumanize) {
-        setIsRehumanizing(true);
-      } else {
-        setIsHumanizing(true);
-      }
+      setIsHumanizing(true);
 
       const response = await fetch('/api/humanize', {
         method: 'POST',
@@ -90,13 +85,12 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
 
       const data = await response.json();
       setHumanizedContent(data);
-      toast.success(isRehumanize ? 'Content rehumanized!' : 'Content humanized!');
+      toast.success('Content humanized!');
     } catch (error) {
       toast.error('Failed to humanize content');
       console.error('Humanization error:', error);
     } finally {
       setIsHumanizing(false);
-      setIsRehumanizing(false);
     }
   };
 
@@ -235,13 +229,6 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
               className="btn-secondary px-4 py-2 text-xs hover-lift"
             >
               Copy
-            </button>
-            <button
-              onClick={() => humanizeContent(humanizedContent.output, true)}
-              disabled={isRehumanizing}
-              className="px-4 py-2 text-xs hover-lift disabled:opacity-50 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors duration-150"
-            >
-              {isRehumanizing ? 'Rehumanizing...' : 'Rehumanize'}
             </button>
           </div>
         </div>
