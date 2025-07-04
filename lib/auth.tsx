@@ -21,14 +21,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
 
   useEffect(() => {
-    // Get initial session with timeout
+    // Get initial session with shorter timeout
     const getSession = async () => {
       let didFinish = false
       const timeout = setTimeout(() => {
         if (!didFinish) {
+          console.warn('Session fetch timed out, clearing session')
+          setSession(null)
+          setUser(null)
           setLoading(false)
         }
-      }, 5000)
+      }, 3000) // Reduced from 5000ms to 3000ms
       
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
@@ -39,9 +42,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await supabase.auth.signOut()
           setSession(null)
           setUser(null)
+        } else if (session?.user) {
+          // Validate the session by checking if user exists
+          const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', session.user.id)
+            .single()
+          
+          if (userError || !userData) {
+            console.error('User not found in database, clearing session')
+            await supabase.auth.signOut()
+            setSession(null)
+            setUser(null)
+          } else {
+            setSession(session)
+            setUser(session.user)
+          }
         } else {
-          setSession(session)
-          setUser(session?.user ?? null)
+          setSession(null)
+          setUser(null)
         }
         
         didFinish = true

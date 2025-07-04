@@ -14,31 +14,67 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading, signInWithGoogle } = useAuth()
   const [isApproved, setIsApproved] = useState<boolean | null>(null)
   const [fetching, setFetching] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const pathname = usePathname()
 
   useEffect(() => {
     if (!user) {
       setFetching(false)
+      setError(null)
       return
     }
     const fetchApproval = async () => {
       setFetching(true)
+      setError(null)
       const supabase = createClient()
-      const { data } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('users')
         .select('is_approved')
         .eq('id', user.id)
         .single()
-      setIsApproved(data?.is_approved ?? null)
+      
+      if (fetchError) {
+        console.error('Error fetching approval status:', fetchError)
+        if (fetchError.code === 'PGRST116') {
+          // User not found in database
+          setError('User account not found. Please contact support.')
+        } else {
+          setError('Failed to check approval status. Please try again.')
+        }
+        setIsApproved(null)
+      } else {
+        setIsApproved(data?.is_approved ?? null)
+      }
       setFetching(false)
     }
     fetchApproval()
   }, [user])
 
-  if (loading || fetching) {
+  // Show spinner/blank if loading, fetching, or isApproved === null (and no error)
+  if (loading || (user && fetching) || (user && isApproved === null && !error)) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="loader"></div>
+      </div>
+    )
+  }
+
+  // Show error if there's an error
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-4">
+        <div className="bg-white p-8 rounded-lg shadow flex flex-col items-center" style={{ minWidth: 320 }}>
+          <Sparkles className="w-10 h-10 text-red-400 mb-4" />
+          <div className="text-xl font-bold mb-1 text-red-600">Error</div>
+          <div className="text-gray-600 mb-2 text-center">{error}</div>
+          <button
+            type="button"
+            className="button"
+            onClick={() => window.location.reload()}
+          >
+            Try Again
+          </button>
+        </div>
       </div>
     )
   }
@@ -67,8 +103,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     )
   }
 
-  // Block access if not approved, except on /profile
-  if (!isApproved && pathname !== '/profile') {
+  // Show approval page if isApproved === false and not on /profile
+  if (isApproved === false && pathname !== '/profile') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="bg-white p-8 rounded-lg shadow flex flex-col items-center" style={{ minWidth: 320 }}>
@@ -96,5 +132,6 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     )
   }
 
+  // Show normal page if isApproved === true
   return <>{children}</>
 } 
