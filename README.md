@@ -16,7 +16,7 @@ A full-stack AI-powered blog content generator built with Next.js, React, and Op
 - **Frontend**: Next.js 14, React 18, TypeScript
 - **Styling**: Tailwind CSS
 - **Icons**: Lucide React
-- **AI**: OpenAI GPT-4o
+- **AI**: OpenAI GPT-4o & Together.ai (DeepSeek, Llama, Claude, etc.)
 - **File Processing**: PDF parsing, URL scraping with Cheerio
 - **UI Components**: Custom components with modern design
 
@@ -36,15 +36,18 @@ A full-stack AI-powered blog content generator built with Next.js, React, and Op
 3. **Set up environment variables**
    Create a `.env.local` file in the root directory:
    ```env
+   # OpenAI API Configuration
    OPENAI_API_KEY=your_openai_api_key_here
+   
+   # Together.ai API Configuration
+   TOGETHER_API_KEY=your_together_api_key_here
    ```
 
-4. **Get your OpenAI API key**
-   - Visit [OpenAI Platform](https://platform.openai.com/)
-   - Create an account or sign in
-   - Navigate to API Keys section
-   - Create a new API key
-   - Copy and paste it into your `.env.local` file
+4. **Get your API keys**
+   - **OpenAI**: Visit [OpenAI Platform](https://platform.openai.com/)
+   - **Together.ai**: Visit [Together.ai Platform](https://together.ai/)
+   - Create accounts and generate API keys
+   - Copy and paste them into your `.env.local` file
 
 5. **Run the development server**
    ```bash
@@ -62,6 +65,8 @@ A full-stack AI-powered blog content generator built with Next.js, React, and Op
 - Keywords will be used for SEO optimization
 
 ### Step 2: Configure Blog Settings
+- Choose AI provider (OpenAI or Together.ai)
+- Select AI model (GPT-4o, DeepSeek V3, Llama 3.1, etc.)
 - Choose blog format (Listicle, Informative, etc.)
 - Select word count range
 - Set number of paragraphs
@@ -125,7 +130,9 @@ Generates complete blog content based on form data.
     "urls": [],
     "customText": ""
   },
-  "temperature": 0.8
+  "temperature": 0.8,
+  "apiProvider": "openai",
+  "model": "gpt-4o"
 }
 ```
 
@@ -186,7 +193,8 @@ idea-to-content/
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `OPENAI_API_KEY` | Your OpenAI API key | Yes |
+| `OPENAI_API_KEY` | Your OpenAI API key | Yes (for OpenAI) |
+| `TOGETHER_API_KEY` | Your Together.ai API key | Yes (for Together.ai) |
 
 ## 🤝 Contributing
 

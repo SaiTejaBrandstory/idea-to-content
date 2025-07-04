@@ -1,12 +1,17 @@
 'use client'
 
-import { BlogContent } from '@/types/blog'
-import { useMemo, useState } from 'react'
+import { BlogContent, ModelInfo } from '@/types/blog'
+import { useMemo, useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import toast from 'react-hot-toast'
 
 interface BlogPreviewProps {
-  content: BlogContent & { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } }
+  content: BlogContent & { 
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+    apiProvider?: string
+    model?: string
+    selectedModel?: ModelInfo
+  }
 }
 
 const markdownComponents = {
@@ -40,6 +45,19 @@ const getFleschScoreLabel = (score: number) => {
   return 'Difficult';
 };
 
+function stripMarkdown(md: string) {
+  return md
+    .replace(/^#+\s?/gm, '') // Remove headings
+    .replace(/[\*_~`>]/g, '') // Remove *, _, ~, `, >
+    .replace(/\[(.*?)\]\(.*?\)/g, '$1') // Remove links, keep text
+    .replace(/!\[(.*?)\]\(.*?\)/g, '') // Remove images
+    .replace(/^\s*-\s+/gm, '') // Remove list dashes
+    .replace(/^\s*\d+\.\s+/gm, '') // Remove numbered lists
+    .replace(/^\s*>+\s?/gm, '') // Remove blockquotes
+    .replace(/\n{2,}/g, '\n\n') // Normalize newlines
+    .trim();
+}
+
 export default function BlogPreview({ content }: BlogPreviewProps) {
   const [isHumanizing, setIsHumanizing] = useState(false);
   const [humanizedContent, setHumanizedContent] = useState<HumanizedContent | null>(null);
@@ -50,21 +68,65 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
     return allText.split(/\s+/).filter(Boolean).length
   }, [content])
 
-  // Cost calculation (unchanged)
-  const getCost = (usage?: { prompt_tokens?: number; completion_tokens?: number }) => {
-    if (!usage) return null
+  // Cost calculation using real API pricing and usage data
+  const getCost = async (usage?: { prompt_tokens?: number; completion_tokens?: number }, provider?: string, model?: string, selectedModel?: ModelInfo) => {
+    if (!usage || !provider || !model) return null
+    
     const input = usage.prompt_tokens || 0
     const output = usage.completion_tokens || 0
-    const inputCost = (input / 1000) * 0.005
-    const outputCost = (output / 1000) * 0.015
+    
+    try {
+      // Fetch real-time pricing from the API
+      const pricingResponse = await fetch(`/api/pricing?provider=${provider}&model=${encodeURIComponent(model)}`)
+      
+      if (!pricingResponse.ok) {
+        const errorData = await pricingResponse.json().catch(() => ({}))
+        console.warn(`[cost] Pricing API returned ${pricingResponse.status}:`, errorData.error || 'Unknown error')
+        return 'Pricing not available'
+      }
+      
+      const pricingData = await pricingResponse.json()
+      const { pricing, units } = pricingData
+      
+      let inputCost = 0
+      let outputCost = 0
+      
+      if (units === 'per_1M_tokens') {
+        // Together.ai pricing is per 1M tokens
+        inputCost = (input / 1000000) * pricing.input
+        outputCost = (output / 1000000) * pricing.output
+      } else {
+        // OpenAI pricing is per 1K tokens
+        inputCost = (input / 1000) * pricing.input
+        outputCost = (output / 1000) * pricing.output
+      }
+      
     const total = inputCost + outputCost
     if (total > 0) {
       const inr = total * 83
-      return `$${total.toFixed(4)} USD (₹${inr.toFixed(2)} INR)`
+        return `$${total.toFixed(6)} USD (₹${inr.toFixed(2)} INR)`
     }
     return null
+    } catch (error) {
+      console.error('Error calculating cost with real pricing:', error)
+      return 'Pricing not available'
+    }
   }
-  const cost = getCost(content.usage)
+
+
+
+  // Use useEffect to calculate cost asynchronously
+  const [cost, setCost] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (content.usage && content.apiProvider && content.model) {
+      getCost(content.usage, content.apiProvider, content.model, content.selectedModel)
+        .then(setCost)
+        .catch(() => setCost('Pricing not available'))
+    } else {
+      setCost(null)
+    }
+  }, [content.usage, content.apiProvider, content.model, content.selectedModel])
 
   // Humanize the content
   const humanizeContent = async (text: string) => {
@@ -94,9 +156,20 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
     }
   };
 
+  // Copy to clipboard with proper line breaks
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(stripMarkdown(text))
+      toast.success('Copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy text: ', err)
+      toast.error('Failed to copy text');
+    }
+  }
+
   // Download as TXT with proper line breaks
   const downloadBlog = (text: string, prefix: string = '') => {
-    const blogText = `${text}`.trim()
+    const blogText = stripMarkdown(`${text}`.trim())
     const blob = new Blob([blogText], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -106,17 +179,6 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-  }
-
-  // Copy to clipboard with proper line breaks
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      toast.success('Copied to clipboard!');
-    } catch (err) {
-      console.error('Failed to copy text: ', err)
-      toast.error('Failed to copy text');
-    }
   }
 
   // Get the full blog text for humanization
@@ -131,10 +193,20 @@ export default function BlogPreview({ content }: BlogPreviewProps) {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 bg-white">
-      {/* Word Count & Cost */}
+      {/* Word Count, API Provider & Cost */}
       <div className="mb-2 text-xs text-gray-500 font-medium">
-        Word count: {wordCount}
-        {cost && <span className="ml-4">• Cost: {cost}</span>}
+        <div className="flex items-center justify-between">
+          <span>Word count: {wordCount}</span>
+          <div className="flex items-center space-x-4">
+            {content.apiProvider && (
+              <span className="flex items-center">
+                <span className="w-2 h-2 rounded-full bg-blue-500 mr-1"></span>
+                Generated with {content.apiProvider === 'openai' ? 'OpenAI' : 'Together.ai'} ({content.model})
+              </span>
+            )}
+            {cost && <span>Cost: {cost}</span>}
+          </div>
+        </div>
       </div>
 
       {/* Meta Info Box */}

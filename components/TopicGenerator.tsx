@@ -14,6 +14,7 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
   const [generatedTitles, setGeneratedTitles] = useState<string[]>([])
   const [error, setError] = useState('')
   const [cost, setCost] = useState<string | null>(null)
+  const [apiProvider, setApiProvider] = useState<string | null>(null)
 
   const emphasisTypes = [
     'Keyword Emphasis',
@@ -23,6 +24,61 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
     'Hybrid Emphasis'
   ];
 
+  // Cost calculation using real API pricing and usage data
+  const calculateCost = async (usage: any, provider: string, model: string) => {
+    if (!usage) return null
+    
+    const input = usage.prompt_tokens || 0
+    const output = usage.completion_tokens || 0
+    
+    try {
+      // Fetch real-time pricing from the API
+      const pricingResponse = await fetch(`/api/pricing?provider=${provider}&model=${encodeURIComponent(model)}`)
+      
+      if (!pricingResponse.ok) {
+        const errorData = await pricingResponse.json().catch(() => ({}))
+        console.warn(`[cost] Pricing API returned ${pricingResponse.status}:`, errorData.error || 'Unknown error')
+        return 'Pricing not available'
+      }
+      
+      const pricingData = await pricingResponse.json()
+      const { pricing, units } = pricingData
+      
+      console.log(`[cost] Pricing data:`, pricingData)
+      console.log(`[cost] Units: ${units}, Pricing:`, pricing)
+      console.log(`[cost] Token usage: ${input} input, ${output} output`)
+      
+      let inputCost = 0
+      let outputCost = 0
+      
+      if (units === 'per_1M_tokens') {
+        // Together.ai pricing is per 1M tokens
+        inputCost = (input / 1000000) * pricing.input
+        outputCost = (output / 1000000) * pricing.output
+        console.log(`[cost] Using per_1M_tokens calculation`)
+      } else {
+        // OpenAI pricing is per 1K tokens
+        inputCost = (input / 1000) * pricing.input
+        outputCost = (output / 1000) * pricing.output
+        console.log(`[cost] Using per_1K_tokens calculation`)
+      }
+      
+      console.log(`[cost] Calculated costs: input=${inputCost}, output=${outputCost}`)
+      
+      const total = inputCost + outputCost
+      if (total > 0) {
+        const inr = total * 83
+        return `$${total.toFixed(6)} USD (₹${inr.toFixed(2)} INR)`
+      }
+      return null
+    } catch (error) {
+      console.error('Error calculating cost with real pricing:', error)
+      return 'Pricing not available'
+    }
+  }
+
+
+
   const generateTitles = async () => {
     if (formData.keywords.length === 0) {
       setError('Please add keywords first')
@@ -31,8 +87,12 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
 
     setIsGenerating(true)
     setError('')
+    setCost(null)
+    setApiProvider(null)
 
     try {
+      console.log(`Generating titles using ${formData.apiProvider} with model: ${formData.model}`)
+      
       const response = await fetch('/api/generate-titles', {
         method: 'POST',
         headers: {
@@ -41,6 +101,8 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
         body: JSON.stringify({
           keywords: formData.keywords,
           blogType: formData.blogType,
+          apiProvider: formData.apiProvider,
+          model: formData.model,
         }),
       })
 
@@ -50,18 +112,17 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
 
       const data = await response.json()
       setGeneratedTitles((data.titles || []).map((t: any) => typeof t === 'string' ? t : t.title))
+      
+      // Set API provider for display
+      setApiProvider(formData.apiProvider)
+      
+      // Calculate cost based on provider
       if (data.usage) {
-        const input = data.usage.prompt_tokens || 0
-        const output = data.usage.completion_tokens || 0
-        const inputCost = (input / 1000) * 0.005
-        const outputCost = (output / 1000) * 0.015
-        const total = inputCost + outputCost
-        if (total > 0) {
-          const inr = total * 83
-          setCost(`$${total.toFixed(4)} USD (₹${inr.toFixed(2)} INR)`)
-        } else {
-          setCost(null)
-        }
+        const calculatedCost = await calculateCost(data.usage, formData.apiProvider, formData.model)
+        setCost(calculatedCost)
+        console.log(`Generated ${data.titles.length} titles using ${formData.apiProvider} (${formData.model})`)
+        console.log(`Token usage: ${data.usage.prompt_tokens} input, ${data.usage.completion_tokens} output`)
+        console.log(`Estimated cost: ${calculatedCost}`)
       } else {
         setCost(null)
       }
@@ -104,8 +165,37 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
           </h2>
         </div>
         <p className="body-text text-gray-600 max-w-lg mx-auto">
-          Generate compelling titles based on your keywords and blog type.
+          Generate compelling titles based on your keywords and blog type using the selected model.
         </p>
+        
+        {/* Model Information */}
+        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-semibold text-black text-sm mb-1">Selected Model</h4>
+              <p className="text-sm text-gray-700">
+                {formData.selectedModel ? (
+                  <>
+                    <span className="font-medium">{formData.selectedModel.name}</span>
+                    <span className="text-gray-500 ml-2">({formData.selectedModel.provider === 'openai' ? 'OpenAI' : 'Together.ai'})</span>
+                  </>
+                ) : (
+                  <span className="text-gray-500">{formData.model} ({formData.apiProvider === 'openai' ? 'OpenAI' : 'Together.ai'})</span>
+                )}
+              </p>
+            </div>
+            {formData.selectedModel && (
+              <div className="text-right">
+                <p className="text-xs text-gray-500">
+                  ${formData.selectedModel.pricing.input}/{formData.selectedModel.provider === 'together' ? '1M' : '1K'} input
+                </p>
+                <p className="text-xs text-gray-500">
+                  ${formData.selectedModel.pricing.output}/{formData.selectedModel.provider === 'together' ? '1M' : '1K'} output
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -113,12 +203,11 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
         <div className="text-center">
           <button
             onClick={generateTitles}
-            disabled={isGenerating || formData.keywords.length === 0}
-            className="btn-primary px-6 disabled:opacity-50 disabled:cursor-not-allowed hover-lift"
+            disabled={isGenerating || formData.keywords.length === 0 || !formData.model}
+            className="btn-primary px-6 min-w-[180px] disabled:opacity-50 disabled:cursor-not-allowed hover-lift"
           >
             {isGenerating ? (
               <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                 Generating Titles...
               </div>
             ) : (
@@ -140,9 +229,18 @@ export default function TopicGenerator({ formData, updateFormData }: TopicGenera
         {/* Generated Titles */}
         {generatedTitles.length > 0 && (
           <div className="space-y-4">
-            {cost && (
-              <div className="mb-2 text-xs text-gray-500 font-medium">Cost: {cost}</div>
-            )}
+            {/* API Provider and Cost Info */}
+            <div className="flex items-center justify-between text-xs text-gray-500 font-medium">
+              <div className="flex items-center space-x-4">
+                {apiProvider && (
+                  <span className="flex items-center">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 mr-1"></span>
+                    Generated with {apiProvider === 'openai' ? 'OpenAI' : 'Together.ai'} ({formData.model})
+                  </span>
+                )}
+                {cost && <span>Cost: {cost}</span>}
+              </div>
+            </div>
             <div className="flex items-center justify-between">
               <h3 className="heading-3 text-black">
                 Generated Titles ({generatedTitles.length})

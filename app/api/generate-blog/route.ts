@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import Together from 'together-ai'
 import { BlogFormData, BlogContent } from '@/types/blog'
 import { processReferences } from '@/lib/reference-processor'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
+
+// Initialize Together client only when needed
+const getTogetherClient = () => {
+  if (!process.env.TOGETHER_API_KEY) {
+    throw new Error('Together.ai API key not configured')
+  }
+  return new Together()
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,9 +27,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    // Validate API keys based on provider
+    if (formData.apiProvider === 'openai' && !process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
+        { status: 500 }
+      )
+    }
+
+    if (formData.apiProvider === 'together' && !process.env.TOGETHER_API_KEY) {
+      return NextResponse.json(
+        { error: 'Together.ai API key not configured' },
         { status: 500 }
       )
     }
@@ -113,8 +130,33 @@ Format your response as JSON with the following structure:
   "cta": "Call to action (optional based on blog type)"
 }`
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    let completion: any
+    let usage = null
+
+    if (formData.apiProvider === 'openai') {
+      console.log(`[generate-blog] Using OpenAI with model: ${formData.model}`)
+      completion = await openai.chat.completions.create({
+        model: formData.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature: formData.temperature,
+        max_tokens: maxTokens,
+        response_format: { type: 'json_object' }
+      })
+      usage = completion.usage
+    } else if (formData.apiProvider === 'together') {
+      console.log(`[generate-blog] Using Together.ai with model: ${formData.model}`)
+      const together = getTogetherClient()
+      completion = await together.chat.completions.create({
+        model: formData.model,
       messages: [
         {
           role: 'system',
@@ -129,10 +171,16 @@ Format your response as JSON with the following structure:
       max_tokens: maxTokens,
       response_format: { type: 'json_object' }
     })
+      usage = completion.usage
+    }
+
+    if (!completion) {
+      throw new Error(`No completion generated from ${formData.apiProvider}`)
+    }
 
     const content = completion.choices[0]?.message?.content
     if (!content) {
-      throw new Error('No content generated from OpenAI')
+      throw new Error(`No content generated from ${formData.apiProvider}`)
     }
 
     let blogContent: BlogContent
@@ -140,7 +188,7 @@ Format your response as JSON with the following structure:
       blogContent = JSON.parse(content)
     } catch (parseError) {
       console.error('Failed to parse JSON response:', parseError)
-      throw new Error('Invalid response format from OpenAI')
+      throw new Error(`Invalid response format from ${formData.apiProvider}`)
     }
 
     // Validate the response structure
@@ -157,15 +205,22 @@ Format your response as JSON with the following structure:
     }
 
     // Return token usage and tooShort flag if available
-    const usage = completion.usage || null
-    return NextResponse.json({ ...blogContent, usage, tooShort, actualWordCount })
+    return NextResponse.json({ 
+      ...blogContent, 
+      usage, 
+      tooShort, 
+      actualWordCount,
+      apiProvider: formData.apiProvider,
+      model: formData.model,
+      selectedModel: formData.selectedModel
+    })
   } catch (error: any) {
     console.error('Error generating blog:', error)
     
-    // Handle specific OpenAI errors
+    // Handle specific API errors
     if (error?.status === 401) {
       return NextResponse.json(
-        { error: 'Invalid OpenAI API key. Please check your configuration.' },
+        { error: 'Invalid API key. Please check your configuration.' },
         { status: 401 }
       )
     }

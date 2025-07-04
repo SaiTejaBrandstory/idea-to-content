@@ -10,6 +10,9 @@ export interface BlogFormData {
     customText: string
   }
   temperature: number
+  apiProvider: 'openai' | 'together'
+  model: string
+  selectedModel?: ModelInfo
 }
 
 export interface BlogContent {
@@ -30,4 +33,17 @@ export interface ReferenceContent {
   type: 'file' | 'url' | 'text'
   content: string
   source: string
+}
+
+export interface ModelInfo {
+  id: string
+  name: string
+  description: string
+  provider: 'openai' | 'together'
+  pricing: {
+    input: number
+    output: number
+  }
+  author?: string
+  type?: string
 } 
