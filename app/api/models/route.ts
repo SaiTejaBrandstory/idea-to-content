@@ -42,10 +42,10 @@ export async function GET(request: NextRequest) {
           .map(model => ({
             id: model.id,
             name: model.id,
-            description: model.description || getOpenAIModelDescription(model.id),
+            description: (model as any).description || getOpenAIModelDescription(model.id),
             provider: 'openai',
             pricing: getOpenAIPricing(model.id),
-            type: model.type || '',
+            type: (model as any).type || '',
             // Add more fields if available
           }))
       } catch (error) {
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
           provider: 'together',
           pricing: getTogetherPricing(model.id),
           author: model.author || '',
-          type: model.type || '',
+          type: (model as any).type || '',
           // You can add more fields if needed
         }))
       } catch (error) {
