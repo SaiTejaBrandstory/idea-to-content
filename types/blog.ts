@@ -46,4 +46,11 @@ export interface ModelInfo {
   }
   author?: string
   type?: string
+}
+
+export interface Model {
+  id: string;
+  name: string;
+  // ...other properties
+  type?: string; // Optional type property for compatibility
 } 
