@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
             description: getOpenAIModelDescription(model.id),
             provider: 'openai',
             pricing: getOpenAIPricing(model.id),
-            type: model.type || 'chat',
+            type: (model as any).type || 'chat',
             isFeatured: true
           }))
           .sort((a, b) => {
@@ -124,12 +124,12 @@ export async function GET(request: NextRequest) {
           .filter(isFeaturedModel)
           .map(model => ({
             id: model.id,
-            name: model.name || getTogetherModelName(model.id),
-            description: model.description || getTogetherModelDescription(model.id),
+            name: (model as any).name || '',
+            description: (model as any).description || '',
             provider: 'together',
             pricing: getTogetherPricing(model.id),
-            author: model.author || '',
-            type: model.type || 'chat',
+            author: (model as any).author || '',
+            type: (model as any).type || 'chat',
             isFeatured: true
           }))
           .sort((a, b) => {
