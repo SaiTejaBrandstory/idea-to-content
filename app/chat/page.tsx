@@ -22,6 +22,15 @@ const PROVIDERS = [
   { id: 'together', name: 'Together.ai' },
 ];
 
+// Utility to preprocess markdown: remove all empty/whitespace-only lines and collapse multiple blank lines
+function compactMarkdown(text: string) {
+  return text
+    .split('\n')
+    .filter(line => line.trim() !== '')
+    .join('\n')
+    .replace(/\n{2,}/g, '\n\n');
+}
+
 export default function ChatPage() {
   // All hooks at the top, no early returns!
   const { user, loading } = useAuth();
@@ -35,6 +44,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const chatBottomRef = useRef<HTMLDivElement>(null);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -102,6 +112,11 @@ export default function ChatPage() {
     if (chatArea.scrollHeight > chatArea.clientHeight) {
       chatArea.scrollTop = chatArea.scrollHeight;
     }
+  }, [messages]);
+
+  // Always scroll to the bottom when messages change
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async () => {
@@ -183,29 +198,32 @@ export default function ChatPage() {
                 <span className="text-[11px] text-gray-400">[{msg.model} / {msg.api}]</span>
               </div>
               <div className="text-sm">
-                <ReactMarkdown
-                  rehypePlugins={[rehypeHighlight]}
-                  components={{
-                    code(props) {
-                      const { children, className } = props;
-                      // @ts-ignore
-                      const isInline = props.inline;
-                      return isInline ? (
-                        <code className="bg-gray-200 text-pink-700 px-1.5 py-0.5 rounded text-[13px] font-mono">{children}</code>
-                      ) : (
-                        <pre className="bg-gray-900 text-green-200 rounded-xl p-4 overflow-x-auto my-2 text-[13px] font-mono">
-                          <code {...props}>{children}</code>
-                        </pre>
-                      );
-                    }
-                  }}
-                >
-                  {msg.text}
-                </ReactMarkdown>
+                <div className="chat-markdown">
+                  <ReactMarkdown
+                    rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      code(props) {
+                        const { children, className } = props;
+                        // @ts-ignore
+                        const isInline = props.inline;
+                        return isInline ? (
+                          <code className="bg-gray-200 text-pink-700 px-1.5 py-0.5 rounded text-[13px] font-mono">{children}</code>
+                        ) : (
+                          <pre className="bg-gray-900 text-green-200 rounded-xl p-4 overflow-x-auto my-2 text-[13px] font-mono">
+                            <code {...props}>{children}</code>
+                          </pre>
+                        );
+                      }
+                    }}
+                  >
+                    {compactMarkdown(msg.text)}
+                  </ReactMarkdown>
+                </div>
               </div>
             </div>
           </div>
         ))}
+        <div ref={chatBottomRef} />
         {aiLoading && (
           <div className="flex justify-start">
             <div className="max-w-3xl inline-block px-4 py-2 rounded-2xl shadow-md text-sm bg-gray-100 text-gray-400 border border-gray-200 rounded-bl-md animate-pulse">
@@ -242,6 +260,32 @@ export default function ChatPage() {
         @keyframes shimmer {
           0% { background-position: 200% 0; }
           100% { background-position: -200% 0; }
+        }
+        .chat-markdown {
+          line-height: 1.3;
+        }
+        .chat-markdown p,
+        .chat-markdown ul,
+        .chat-markdown ol,
+        .chat-markdown li,
+        .chat-markdown blockquote,
+        .chat-markdown h1,
+        .chat-markdown h2,
+        .chat-markdown h3,
+        .chat-markdown h4,
+        .chat-markdown h5,
+        .chat-markdown h6 {
+          margin: 0.05em 0 0.05em 0 !important;
+          min-height: 0;
+        }
+        .chat-markdown ul,
+        .chat-markdown ol {
+          padding-left: 1em;
+        }
+        .chat-markdown blockquote {
+          padding-left: 0.4em;
+          border-left: 2px solid #e5e7eb;
+          color: #6b7280;
         }
       `}</style>
       {/* Model selection and input bar (compact, sticky at bottom) */}
