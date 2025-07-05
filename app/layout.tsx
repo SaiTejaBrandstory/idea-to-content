@@ -4,7 +4,7 @@ import './globals.css'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/lib/auth'
 import Header from '@/components/Header'
-import Footer from '@/components/Footer'
+import ConditionalFooter from '@/components/ConditionalFooter'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -24,7 +24,7 @@ export default function RootLayout({
         <AuthProvider>
           <Header />
           {children}
-          <Footer />
+          <ConditionalFooter />
           <Toaster 
             position="top-right"
             toastOptions={{

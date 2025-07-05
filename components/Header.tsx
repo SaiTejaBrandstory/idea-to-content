@@ -83,22 +83,10 @@ export default function Header() {
               Home
             </Link>
             <Link 
-              href="#" 
-              className="body-text font-medium text-gray-700 hover:text-black transition-colors"
+              href="/chat" 
+              className="body-text font-medium text-violet-700 hover:text-violet-900 transition-colors"
             >
-              Features
-            </Link>
-            <Link 
-              href="#" 
-              className="body-text font-medium text-gray-700 hover:text-black transition-colors"
-            >
-              Pricing
-            </Link>
-            <Link 
-              href="#" 
-              className="body-text font-medium text-gray-700 hover:text-black transition-colors"
-            >
-              About
+              AI Assistant
             </Link>
           </nav>
 
