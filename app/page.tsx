@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import KeywordInput from '@/components/KeywordInput'
 import BlogTypeSelector from '@/components/BlogTypeSelector'
 import TopicGenerator from '@/components/TopicGenerator'
@@ -25,15 +25,76 @@ export default function Home() {
     },
     temperature: 0.8,
     apiProvider: 'openai',
-    model: 'gpt-4o'
+    model: 'gpt-4o',
+    selectedModel: {
+      id: 'gpt-4o',
+      name: 'GPT-4o',
+      description: 'OpenAI\'s latest model with improved performance',
+      provider: 'openai',
+      pricing: { input: 0.005, output: 0.015 }
+    }
   })
 
   const [generatedContent, setGeneratedContent] = useState<BlogContent | null>(null)
+  const [humanizedContent, setHumanizedContent] = useState<{ output: string; new_flesch_score: number } | null>(null)
+  const [generatedTitles, setGeneratedTitles] = useState<string[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
 
+  // Persist humanized content in localStorage
+  const setHumanizedContentPersistent = (content: { output: string; new_flesch_score: number } | null) => {
+    setHumanizedContent(content)
+    if (content && generatedContent) {
+      localStorage.setItem('humanizedContent', JSON.stringify(content))
+    } else {
+      localStorage.removeItem('humanizedContent')
+    }
+  }
+
+  // Persist generated titles in localStorage
+  const setGeneratedTitlesPersistent = (titles: string[]) => {
+    setGeneratedTitles(titles)
+    if (titles.length > 0) {
+      localStorage.setItem('generatedTitles', JSON.stringify(titles))
+    } else {
+      localStorage.removeItem('generatedTitles')
+    }
+  }
+
+  // Load saved content from localStorage on mount
+  useEffect(() => {
+    // Load humanized content
+    const savedHumanized = localStorage.getItem('humanizedContent')
+    if (savedHumanized) {
+      try {
+        const parsed = JSON.parse(savedHumanized)
+        setHumanizedContent(parsed)
+      } catch (error) {
+        console.error('Failed to parse saved humanized content:', error)
+        localStorage.removeItem('humanizedContent')
+      }
+    }
+
+    // Load generated titles
+    const savedTitles = localStorage.getItem('generatedTitles')
+    if (savedTitles) {
+      try {
+        const parsed = JSON.parse(savedTitles)
+        setGeneratedTitles(parsed)
+      } catch (error) {
+        console.error('Failed to parse saved generated titles:', error)
+        localStorage.removeItem('generatedTitles')
+      }
+    }
+  }, [])
+
   const updateFormData = (updates: Partial<BlogFormData>) => {
     setFormData(prev => ({ ...prev, ...updates }))
+    
+    // Clear generated titles if keywords change
+    if (updates.keywords && updates.keywords.length !== formData.keywords.length) {
+      setGeneratedTitlesPersistent([])
+    }
   }
 
   const generateBlog = async () => {
@@ -44,6 +105,15 @@ export default function Home() {
 
     setIsGenerating(true)
     try {
+      console.log('Sending blog generation request with data:', {
+        selectedTitle: formData.selectedTitle,
+        keywords: formData.keywords,
+        apiProvider: formData.apiProvider,
+        model: formData.model,
+        blogType: formData.blogType,
+        wordCount: formData.wordCount
+      })
+
       const response = await fetch('/api/generate-blog', {
         method: 'POST',
         headers: {
@@ -53,14 +123,17 @@ export default function Home() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to generate blog')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
       setGeneratedContent(data)
-    } catch (error) {
+      setHumanizedContentPersistent(null) // Clear humanized content when new content is generated
+      setGeneratedTitlesPersistent([]) // Clear generated titles when new content is generated
+    } catch (error: any) {
       console.error('Error generating blog:', error)
-      alert('Failed to generate blog. Please try again.')
+      alert(`Failed to generate blog: ${error.message}`)
     } finally {
       setIsGenerating(false)
     }
@@ -74,7 +147,11 @@ export default function Home() {
     { id: 5, title: 'Topics', component: TopicGenerator },
   ]
 
-  const CurrentStepComponent = steps[currentStep - 1]?.component
+  const CurrentStepComponent = useMemo(() => {
+    return steps[currentStep - 1]?.component
+  }, [currentStep])
+
+
 
   return (
     <div className="min-h-screen bg-white text-black">
@@ -135,6 +212,8 @@ export default function Home() {
                   )}
                 </button>
 
+
+
                 {/* Navigation */}
                 <div className="flex gap-2 flex-nowrap">
                   <button
@@ -164,6 +243,8 @@ export default function Home() {
                   <CurrentStepComponent
                     formData={formData}
                     updateFormData={updateFormData}
+                    generatedTitles={generatedTitles}
+                    setGeneratedTitles={setGeneratedTitlesPersistent}
                   />
                 )}
               </div>
@@ -171,7 +252,11 @@ export default function Home() {
               {/* Generated Content Preview */}
               {generatedContent && (
                 <div className="mt-6 slide-up">
-                  <BlogPreview content={generatedContent} />
+                  <BlogPreview 
+                    content={generatedContent} 
+                    humanizedContent={humanizedContent}
+                    setHumanizedContent={setHumanizedContentPersistent}
+                  />
                 </div>
               )}
             </div>

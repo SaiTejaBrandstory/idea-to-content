@@ -7,6 +7,8 @@ import { X, Plus, Hash } from 'lucide-react'
 interface KeywordInputProps {
   formData: BlogFormData
   updateFormData: (updates: Partial<BlogFormData>) => void
+  generatedTitles?: string[]
+  setGeneratedTitles?: (titles: string[]) => void
 }
 
 export default function KeywordInput({ formData, updateFormData }: KeywordInputProps) {

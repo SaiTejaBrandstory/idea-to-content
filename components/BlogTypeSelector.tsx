@@ -6,6 +6,8 @@ import { Settings, Target, Zap } from 'lucide-react'
 interface BlogTypeSelectorProps {
   formData: BlogFormData
   updateFormData: (updates: Partial<BlogFormData>) => void
+  generatedTitles?: string[]
+  setGeneratedTitles?: (titles: string[]) => void
 }
 
 export default function BlogTypeSelector({ formData, updateFormData }: BlogTypeSelectorProps) {

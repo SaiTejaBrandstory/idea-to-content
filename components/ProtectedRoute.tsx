@@ -83,7 +83,12 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-4">
         <div className="flex flex-col items-center w-full max-w-md p-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 text-center break-words leading-tight max-w-xs sm:max-w-xl whitespace-normal">Sign in to Create Smarter Content</h1>
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 text-center
+            whitespace-normal break-words leading-snug max-w-xs
+            md:whitespace-nowrap md:break-keep md:leading-tight md:max-w-3xl
+          ">
+            Sign in to Create Smarter Content
+          </h1>
           <p className="text-gray-600 text-center mb-8">Generate high-quality, engaging blog posts from your ideas with just a few clicks.</p>
           <button
             type="button"

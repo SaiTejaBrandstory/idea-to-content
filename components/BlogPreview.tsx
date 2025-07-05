@@ -12,6 +12,8 @@ interface BlogPreviewProps {
     model?: string
     selectedModel?: ModelInfo
   }
+  humanizedContent?: { output: string; new_flesch_score: number } | null
+  setHumanizedContent: (content: { output: string; new_flesch_score: number } | null) => void
 }
 
 const markdownComponents = {
@@ -58,9 +60,8 @@ function stripMarkdown(md: string) {
     .trim();
 }
 
-export default function BlogPreview({ content }: BlogPreviewProps) {
+export default function BlogPreview({ content, humanizedContent, setHumanizedContent }: BlogPreviewProps) {
   const [isHumanizing, setIsHumanizing] = useState(false);
-  const [humanizedContent, setHumanizedContent] = useState<HumanizedContent | null>(null);
 
   // Calculate word count
   const wordCount = useMemo(() => {

@@ -7,11 +7,12 @@ import { Lightbulb, Check, Copy, Download } from 'lucide-react'
 interface TopicGeneratorProps {
   formData: BlogFormData
   updateFormData: (updates: Partial<BlogFormData>) => void
+  generatedTitles: string[]
+  setGeneratedTitles: (titles: string[]) => void
 }
 
-export default function TopicGenerator({ formData, updateFormData }: TopicGeneratorProps) {
+export default function TopicGenerator({ formData, updateFormData, generatedTitles, setGeneratedTitles }: TopicGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedTitles, setGeneratedTitles] = useState<string[]>([])
   const [error, setError] = useState('')
   const [cost, setCost] = useState<string | null>(null)
   const [apiProvider, setApiProvider] = useState<string | null>(null)

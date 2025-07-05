@@ -7,6 +7,8 @@ import { Upload, Link, FileText, X, Plus } from 'lucide-react'
 interface ReferenceInputProps {
   formData: BlogFormData
   updateFormData: (updates: Partial<BlogFormData>) => void
+  generatedTitles?: string[]
+  setGeneratedTitles?: (titles: string[]) => void
 }
 
 export default function ReferenceInput({ formData, updateFormData }: ReferenceInputProps) {

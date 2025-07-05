@@ -8,6 +8,8 @@ import ApiProviderSelector from './ApiProviderSelector'
 interface ModelSelectorProps {
   formData: BlogFormData
   updateFormData: (updates: Partial<BlogFormData>) => void
+  generatedTitles?: string[]
+  setGeneratedTitles?: (titles: string[]) => void
 }
 
 export default function ModelSelector({ formData, updateFormData }: ModelSelectorProps) {

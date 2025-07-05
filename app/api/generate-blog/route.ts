@@ -13,12 +13,23 @@ const getTogetherClient = () => {
   if (!process.env.TOGETHER_API_KEY) {
     throw new Error('Together.ai API key not configured')
   }
-  return new Together()
+  return new Together({
+    apiKey: process.env.TOGETHER_API_KEY,
+  })
 }
 
 export async function POST(request: NextRequest) {
   try {
     const formData: BlogFormData = await request.json()
+    
+    console.log('[generate-blog] Received form data:', {
+      selectedTitle: formData.selectedTitle,
+      keywords: formData.keywords,
+      apiProvider: formData.apiProvider,
+      model: formData.model,
+      blogType: formData.blogType,
+      wordCount: formData.wordCount
+    })
 
     if (!formData.selectedTitle || formData.keywords.length === 0) {
       return NextResponse.json(
@@ -135,32 +146,38 @@ Format your response as JSON with the following structure:
 
     if (formData.apiProvider === 'openai') {
       console.log(`[generate-blog] Using OpenAI with model: ${formData.model}`)
-      completion = await openai.chat.completions.create({
-        model: formData.model,
+      try {
+        completion = await openai.chat.completions.create({
+          model: formData.model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: formData.temperature,
+          max_tokens: maxTokens,
+          response_format: { type: 'json_object' }
+        })
+        usage = completion.usage
+      } catch (apiError: any) {
+        console.error('[generate-blog] OpenAI API error:', apiError)
+        throw new Error(`OpenAI API error: ${apiError.message || 'Unknown error'}`)
+      }
+    } else if (formData.apiProvider === 'together') {
+      console.log(`[generate-blog] Using Together.ai with model: ${formData.model}`)
+      try {
+        const together = getTogetherClient()
+        completion = await together.chat.completions.create({
+          model: formData.model,
         messages: [
           {
             role: 'system',
             content: 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: formData.temperature,
-        max_tokens: maxTokens,
-        response_format: { type: 'json_object' }
-      })
-      usage = completion.usage
-    } else if (formData.apiProvider === 'together') {
-      console.log(`[generate-blog] Using Together.ai with model: ${formData.model}`)
-      const together = getTogetherClient()
-      completion = await together.chat.completions.create({
-        model: formData.model,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
         },
         {
           role: 'user',
@@ -171,7 +188,11 @@ Format your response as JSON with the following structure:
       max_tokens: maxTokens,
       response_format: { type: 'json_object' }
     })
-      usage = completion.usage
+        usage = completion.usage
+      } catch (apiError: any) {
+        console.error('[generate-blog] Together.ai API error:', apiError)
+        throw new Error(`Together.ai API error: ${apiError.message || 'Unknown error'}`)
+      }
     }
 
     if (!completion) {
@@ -212,7 +233,13 @@ Format your response as JSON with the following structure:
       actualWordCount,
       apiProvider: formData.apiProvider,
       model: formData.model,
-      selectedModel: formData.selectedModel
+      selectedModel: formData.selectedModel || {
+        id: formData.model,
+        name: formData.model,
+        description: `Model: ${formData.model}`,
+        provider: formData.apiProvider,
+        pricing: { input: 0, output: 0 }
+      }
     })
   } catch (error: any) {
     console.error('Error generating blog:', error)
@@ -239,8 +266,23 @@ Format your response as JSON with the following structure:
       )
     }
 
+    // Handle API-specific errors
+    if (error?.message?.includes('OpenAI API error')) {
+      return NextResponse.json(
+        { error: `OpenAI API error: ${error.message}` },
+        { status: 500 }
+      )
+    }
+
+    if (error?.message?.includes('Together.ai API error')) {
+      return NextResponse.json(
+        { error: `Together.ai API error: ${error.message}` },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Failed to generate blog content. Please try again.' },
+      { error: `Failed to generate blog content: ${error.message || 'Unknown error'}` },
       { status: 500 }
     )
   }

@@ -18,7 +18,9 @@ const getTogetherClient = () => {
   if (!process.env.TOGETHER_API_KEY) {
     throw new Error('Together.ai API key not configured')
   }
-  return new Together()
+  return new Together({
+    apiKey: process.env.TOGETHER_API_KEY,
+  })
 }
 
 export async function POST(request: NextRequest) {

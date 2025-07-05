@@ -48,10 +48,11 @@ export default function Header() {
   const handleSignOut = async () => {
     try {
       await signOut()
-      window.location.reload()
     } catch (error) {
       console.error('Logout error:', error)
+      // Even if logout fails, we can still close the sidebar and clear local state
       setSidebarOpen(false)
+      // Optionally show a toast or alert to the user
       alert('Logout completed. If you see this message, please refresh the page.')
     }
   }
@@ -67,8 +68,8 @@ export default function Header() {
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="heading-2 gradient-text font-bold break-words text-lg sm:text-xl md:text-2xl lg:text-3xl leading-tight max-w-xs sm:max-w-none whitespace-normal">Idea to Content</h1>
-                <p className="caption text-gray-500 text-xs sm:text-sm md:text-base leading-snug whitespace-normal">AI Blog Generator</p>
+                <h1 className="heading-2 gradient-text font-bold break-words text-base sm:text-lg md:text-xl lg:text-2xl leading-tight max-w-xs sm:max-w-none whitespace-normal">Idea to Content</h1>
+                <p className="caption text-gray-500 text-xs sm:text-xs md:text-sm leading-snug whitespace-normal">AI Blog Generator</p>
               </div>
             </Link>
           </div>
