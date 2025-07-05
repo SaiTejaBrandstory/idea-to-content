@@ -131,15 +131,22 @@ Requirements:
 10. If you finish before reaching the minimum word count, continue writing more content in the same style. Do not summarize or conclude early. Keep expanding until the minimum is reached.
 ${extraParagraphInstruction ? `11. ${extraParagraphInstruction}` : ''}
 
-Format your response as JSON with the following structure:
-{
-  "title": "The exact title provided",
-  "metaDescription": "SEO-optimized meta description",
-  "intro": "Introduction paragraph",
-  "body": ["paragraph 1", "paragraph 2", "paragraph 3", ...],
-  "conclusion": "Conclusion paragraph",
-  "cta": "Call to action (optional based on blog type)"
-}`
+Format your response as follows:
+
+META DESCRIPTION:
+[Your meta description here]
+
+INTRODUCTION:
+[Your introduction paragraph here]
+
+BODY:
+[Your body paragraphs here, separated by double line breaks]
+
+CONCLUSION:
+[Your conclusion paragraph here]
+
+CALL TO ACTION:
+[Your call to action here]`
 
     let completion: any
     let usage = null
@@ -161,8 +168,8 @@ Format your response as JSON with the following structure:
           ],
           temperature: formData.temperature,
           max_tokens: maxTokens,
-          response_format: { type: 'json_object' }
         })
+        console.log('[generate-blog] OpenAI completion:', completion);
         usage = completion.usage
       } catch (apiError: any) {
         console.error('[generate-blog] OpenAI API error:', apiError)
@@ -174,20 +181,19 @@ Format your response as JSON with the following structure:
         const together = getTogetherClient()
         completion = await together.chat.completions.create({
           model: formData.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: formData.temperature,
-      max_tokens: maxTokens,
-      response_format: { type: 'json_object' }
-    })
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: formData.temperature,
+          max_tokens: maxTokens,
+        })
         usage = completion.usage
       } catch (apiError: any) {
         console.error('[generate-blog] Together.ai API error:', apiError)
@@ -201,20 +207,140 @@ Format your response as JSON with the following structure:
 
     const content = completion.choices[0]?.message?.content
     if (!content) {
-      throw new Error(`No content generated from ${formData.apiProvider}`)
+      console.error('[generate-blog] No content in completion:', completion);
+      throw new Error(`No content generated from ${formData.apiProvider}. Raw response: ${JSON.stringify(completion)}`);
     }
 
+    console.log('[generate-blog] Raw content received:', content);
+
+    // Parse the structured text response
     let blogContent: BlogContent
     try {
-      blogContent = JSON.parse(content)
-    } catch (parseError) {
-      console.error('Failed to parse JSON response:', parseError)
-      throw new Error(`Invalid response format from ${formData.apiProvider}`)
-    }
+      // Split content by sections using a more compatible approach
+      const sections = content.split(/\n\n+/);
+      
+      // Extract sections using index-based approach instead of regex with 's' flag
+      const lines = content.split('\n');
+      let metaDescription = '';
+      let intro = '';
+      let body = '';
+      let conclusion = '';
+      let cta = '';
+      
+      let currentSection = '';
+      let currentContent: string[] = [];
+      
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === 'META DESCRIPTION:') {
+          if (currentSection && currentContent.length > 0) {
+            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
+            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
+            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
+            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
+            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
+          }
+          currentSection = 'META DESCRIPTION:';
+          currentContent = [];
+        } else if (trimmedLine === 'INTRODUCTION:') {
+          if (currentSection && currentContent.length > 0) {
+            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
+            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
+            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
+            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
+            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
+          }
+          currentSection = 'INTRODUCTION:';
+          currentContent = [];
+        } else if (trimmedLine === 'BODY:') {
+          if (currentSection && currentContent.length > 0) {
+            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
+            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
+            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
+            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
+            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
+          }
+          currentSection = 'BODY:';
+          currentContent = [];
+        } else if (trimmedLine === 'CONCLUSION:') {
+          if (currentSection && currentContent.length > 0) {
+            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
+            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
+            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
+            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
+            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
+          }
+          currentSection = 'CONCLUSION:';
+          currentContent = [];
+        } else if (trimmedLine === 'CALL TO ACTION:') {
+          if (currentSection && currentContent.length > 0) {
+            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
+            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
+            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
+            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
+            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
+          }
+          currentSection = 'CALL TO ACTION:';
+          currentContent = [];
+        } else if (currentSection) {
+          currentContent.push(line);
+        }
+      }
+      
+      // Handle the last section
+      if (currentSection && currentContent.length > 0) {
+        if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
+        else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
+        else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
+        else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
+        else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
+      }
 
-    // Validate the response structure
-    if (!blogContent.title || !blogContent.metaDescription || !blogContent.intro || !blogContent.body || !blogContent.conclusion) {
-      throw new Error('Incomplete blog content generated')
+      blogContent = {
+        title: formData.selectedTitle,
+        metaDescription: metaDescription || 'SEO-optimized meta description for this blog post',
+        intro: intro || 'Introduction paragraph for the blog post',
+        body: body ? body.split(/\n\n+/).filter((p: string) => p.trim()) : ['Body paragraph for the blog post'],
+        conclusion: conclusion || 'Conclusion paragraph for the blog post',
+        cta: cta || 'Call to action for the blog post'
+      };
+
+      // If parsing failed, create a fallback structure
+      if (!intro && !body && !conclusion) {
+        console.log('[generate-blog] Failed to parse structured format, creating fallback');
+        const paragraphs = content.split(/\n\n+/).filter((p: string) => p.trim());
+        if (paragraphs.length >= 3) {
+          blogContent = {
+            title: formData.selectedTitle,
+            metaDescription: 'SEO-optimized meta description for this blog post',
+            intro: paragraphs[0]?.trim() || 'Introduction paragraph',
+            body: paragraphs.slice(1, -1).map((p: string) => p.trim()).filter(Boolean),
+            conclusion: paragraphs[paragraphs.length - 1]?.trim() || 'Conclusion paragraph',
+            cta: 'Call to action for the blog post'
+          };
+        } else {
+          // Last resort - treat entire content as body
+          blogContent = {
+            title: formData.selectedTitle,
+            metaDescription: 'SEO-optimized meta description for this blog post',
+            intro: 'Introduction paragraph for the blog post',
+            body: [content.trim()],
+            conclusion: 'Conclusion paragraph for the blog post',
+            cta: 'Call to action for the blog post'
+          };
+        }
+      }
+    } catch (parseError) {
+      console.error('Failed to parse blog content:', parseError);
+      // Create a fallback structure
+      blogContent = {
+        title: formData.selectedTitle,
+        metaDescription: 'SEO-optimized meta description for this blog post',
+        intro: 'Introduction paragraph for the blog post',
+        body: [content.trim()],
+        conclusion: 'Conclusion paragraph for the blog post',
+        cta: 'Call to action for the blog post'
+      };
     }
 
     // Calculate actual word count
@@ -256,13 +382,6 @@ Format your response as JSON with the following structure:
       return NextResponse.json(
         { error: 'Rate limit exceeded. Please try again later.' },
         { status: 429 }
-      )
-    }
-
-    if (error?.message?.includes('JSON')) {
-      return NextResponse.json(
-        { error: 'Failed to generate properly formatted content. Please try again.' },
-        { status: 500 }
       )
     }
 
