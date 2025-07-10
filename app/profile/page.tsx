@@ -118,6 +118,34 @@ export default function ProfilePage() {
     window.dispatchEvent(new StorageEvent('storage', { key: 'avatar-updated' }))
   }
 
+  const handleSaveProfile = async () => {
+    if (!user || !profile) return;
+    setSaving(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: profile.full_name,
+          avatar_url: profile.avatar_url
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+      
+      setSaving(false);
+      // Show success message
+      alert('Profile updated successfully!');
+    } catch (err) {
+      setError('Failed to update profile. Please try again.');
+      setSaving(false);
+    }
+  };
+
   const handleRemoveAvatar = async () => {
     if (!user || !profile?.avatar_url) return;
     if (!window.confirm('Are you sure you want to remove your avatar?')) return;
@@ -250,17 +278,18 @@ export default function ProfilePage() {
             <div className="relative group">
               <input
                 type="text"
-                value={profile.full_name}
-                disabled
-                className="w-full px-3 py-2 border rounded bg-gray-100 text-gray-700 pr-10"
+                value={profile.full_name || ''}
+                onChange={(e) => setProfile(prev => prev ? { ...prev, full_name: e.target.value } : prev)}
+                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                placeholder="Enter your full name"
               />
               <button
                 type="button"
-                disabled
-                className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-200 text-gray-400 px-2 py-1 rounded flex items-center cursor-not-allowed"
-                tabIndex={-1}
+                onClick={handleSaveProfile}
+                disabled={saving}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-violet-600 text-white px-2 py-1 rounded hover:bg-violet-700 disabled:opacity-50"
               >
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path fill="currentColor" d="M4 21h17v2H2V3h2v18zm16.7-13.3a1 1 0 0 0-1.4 0l-9.3 9.3-1.3 4.7 4.7-1.3 9.3-9.3a1 1 0 0 0 0-1.4l-2-2zm-2.3 2.3-2-2 1.3-1.3 2 2-1.3 1.3z"/></svg>
+                {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>

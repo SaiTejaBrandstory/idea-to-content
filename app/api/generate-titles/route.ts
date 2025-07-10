@@ -8,6 +8,8 @@ import {
   getTogetherModelDescription, 
   getTogetherPricing 
 } from '@/lib/model-utils'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getSessionId } from '@/lib/session-manager'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -25,7 +27,7 @@ const getTogetherClient = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    const { keywords, blogType, apiProvider = 'openai', model = 'gpt-4o' } = await request.json()
+    const { keywords, blogType, apiProvider = 'openai', model = 'gpt-4o', tone, sessionId } = await request.json()
 
     if (!keywords || keywords.length === 0) {
       return NextResponse.json(
@@ -69,13 +71,18 @@ export async function POST(request: NextRequest) {
         typeInstruction = 'Generate titles suitable for an educational and comprehensive informative blog post.'
     }
 
-    const prompt = `Generate 5 engaging, SEO-friendly blog titles for a ${blogType} blog post using these keywords: ${keywords.join(', ')}. ${typeInstruction}
+    // Tone-specific instruction
+    const toneInstruction = tone ? `The writing tone should be ${tone.subtype} (${tone.type}).` : ''
+
+    const prompt = `Generate 5 engaging, SEO-friendly blog titles for a ${blogType} blog post using these keywords: ${keywords.join(', ')}. ${typeInstruction} ${toneInstruction}
 
 Requirements:
 - Each title should be compelling and click-worthy
 - Include the main keywords naturally
 - Keep titles under 60 characters
 - Return only the titles, one per line`
+
+    console.log('[generate-titles] FINAL PROMPT:', prompt)
 
     let completion: any
     let usage = null
@@ -136,6 +143,106 @@ Requirements:
 
     if (titles.length === 0) {
       throw new Error('No valid titles generated')
+    }
+
+    // Calculate cost for history tracking
+    let totalCostUsd = 0
+    let totalCostInr = 0
+    let inputPricePerToken = 0
+    let outputPricePerToken = 0
+    let pricingUnits = 'per_1K_tokens'
+
+    if (usage) {
+      if (apiProvider === 'openai') {
+        const pricing = getOpenAIPricing(model)
+        inputPricePerToken = pricing.input / 1000
+        outputPricePerToken = pricing.output / 1000
+        pricingUnits = 'per_1K_tokens'
+        totalCostUsd = (usage.prompt_tokens * pricing.input / 1000) + (usage.completion_tokens * pricing.output / 1000)
+      } else {
+        const pricing = getTogetherPricing(model)
+        inputPricePerToken = pricing.input / 1000000
+        outputPricePerToken = pricing.output / 1000000
+        pricingUnits = 'per_1M_tokens'
+        totalCostUsd = (usage.prompt_tokens * pricing.input / 1000000) + (usage.completion_tokens * pricing.output / 1000000)
+      }
+      totalCostInr = totalCostUsd * 83
+    }
+
+    // Save to history (async, don't wait for it)
+    try {
+      const historyData = {
+        operation_type: 'title_generation',
+        api_provider: apiProvider,
+        model_id: model,
+        model_name: apiProvider === 'openai' ? model : getTogetherModelName(model),
+        keywords: keywords,
+        blog_type: blogType,
+        tone_type: tone?.type || null,
+        tone_subtype: tone?.subtype || null,
+        input_tokens: usage?.prompt_tokens || 0,
+        output_tokens: usage?.completion_tokens || 0,
+        total_tokens: usage ? usage.prompt_tokens + usage.completion_tokens : 0,
+        input_price_per_token: inputPricePerToken,
+        output_price_per_token: outputPricePerToken,
+        pricing_units: pricingUnits,
+        input_cost_usd: usage ? (usage.prompt_tokens * inputPricePerToken) : 0,
+        output_cost_usd: usage ? (usage.completion_tokens * outputPricePerToken) : 0,
+        total_cost_usd: totalCostUsd,
+        total_cost_inr: totalCostInr,
+        generated_content_preview: titles.join(', ').substring(0, 500),
+        content_length: titles.join(', ').length,
+        // Additional tracking fields
+        all_generated_titles: titles, // Save all titles, not just selected
+        setup_step: 'title_generation',
+        step_number: 5
+      }
+
+      // Save history directly to database instead of making HTTP request
+      const supabase = createServerSupabaseClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        try {
+          await supabase
+            .from('usage_history')
+            .insert({
+              user_id: user.id,
+              session_id: sessionId || `session_${user.id}_${Math.floor(Date.now() / (30 * 60 * 1000))}`,
+              operation_type: 'title_generation',
+              api_provider: apiProvider,
+              model_id: model,
+              model_name: apiProvider === 'openai' ? model : getTogetherModelName(model),
+              keywords: keywords,
+              blog_type: blogType,
+              tone_type: tone?.type || null,
+              tone_subtype: tone?.subtype || null,
+              input_tokens: usage?.prompt_tokens || 0,
+              output_tokens: usage?.completion_tokens || 0,
+              total_tokens: usage ? usage.prompt_tokens + usage.completion_tokens : 0,
+              input_price_per_token: inputPricePerToken,
+              output_price_per_token: outputPricePerToken,
+              pricing_units: pricingUnits,
+              input_cost_usd: usage ? (usage.prompt_tokens * inputPricePerToken) : 0,
+              output_cost_usd: usage ? (usage.completion_tokens * outputPricePerToken) : 0,
+              total_cost_usd: totalCostUsd,
+              total_cost_inr: totalCostInr,
+                          generated_content_full: titles.join('\n'),
+            generated_content_preview: titles.join(', ').substring(0, 500),
+            content_length: titles.join('\n').length,
+            all_generated_titles: titles,
+              setup_step: 'title_generation',
+              step_number: 5,
+              ip_address: request.headers.get('x-forwarded-for') || request.ip,
+              user_agent: request.headers.get('user-agent')
+            })
+          console.log('[generate-titles] History saved successfully with titles:', titles)
+        } catch (err: any) {
+          console.error('Failed to save history:', err)
+        }
+      }
+    } catch (error) {
+      console.error('Error saving history:', error)
     }
 
     return NextResponse.json({ 

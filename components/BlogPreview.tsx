@@ -14,6 +14,13 @@ interface BlogPreviewProps {
   }
   humanizedContent?: { output: string; new_flesch_score: number } | null
   setHumanizedContent: (content: { output: string; new_flesch_score: number } | null) => void
+  currentSessionId?: string | null
+  sessionSteps?: {
+    titleGenerated: boolean
+    blogGenerated: boolean
+    humanized: boolean
+  }
+  setSessionSteps?: (steps: any) => void
 }
 
 const markdownComponents = {
@@ -60,7 +67,7 @@ function stripMarkdown(md: string) {
     .trim();
 }
 
-export default function BlogPreview({ content, humanizedContent, setHumanizedContent }: BlogPreviewProps) {
+export default function BlogPreview({ content, humanizedContent, setHumanizedContent, currentSessionId, sessionSteps, setSessionSteps }: BlogPreviewProps) {
   const [isHumanizing, setIsHumanizing] = useState(false);
 
   // Calculate word count
@@ -131,6 +138,16 @@ export default function BlogPreview({ content, humanizedContent, setHumanizedCon
 
   // Humanize the content
   const humanizeContent = async (text: string) => {
+    if (!currentSessionId) {
+      toast.error('Please start a new blog first');
+      return;
+    }
+
+    if (sessionSteps?.humanized) {
+      toast.error('Content has already been humanized in this blog');
+      return;
+    }
+
     try {
       setIsHumanizing(true);
 
@@ -139,7 +156,7 @@ export default function BlogPreview({ content, humanizedContent, setHumanizedCon
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, sessionId: currentSessionId }),
       });
 
       if (!response.ok) {
@@ -148,6 +165,15 @@ export default function BlogPreview({ content, humanizedContent, setHumanizedCon
 
       const data = await response.json();
       setHumanizedContent(data);
+      
+      // Save humanized content to localStorage
+      localStorage.setItem('humanizedContent', JSON.stringify(data));
+      
+      // Mark as humanized in session
+      if (setSessionSteps) {
+        setSessionSteps((prev: any) => ({ ...prev, humanized: true }));
+      }
+      
       toast.success('Content humanized!');
     } catch (error) {
       toast.error('Failed to humanize content');
@@ -264,10 +290,10 @@ export default function BlogPreview({ content, humanizedContent, setHumanizedCon
         </button>
         <button
           onClick={() => humanizeContent(getFullBlogText())}
-          disabled={isHumanizing}
+          disabled={isHumanizing || sessionSteps?.humanized}
           className="px-4 py-2 text-xs hover-lift disabled:opacity-50 bg-purple-600 hover:bg-purple-700 text-white rounded font-medium transition-colors duration-150"
         >
-          {isHumanizing ? 'Humanizing...' : 'Humanize'}
+          {sessionSteps?.humanized ? '✓ Humanized' : isHumanizing ? 'Humanizing...' : 'Humanize'}
         </button>
       </div>
 

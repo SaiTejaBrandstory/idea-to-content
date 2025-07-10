@@ -1,5 +1,5 @@
 import { useRouter } from 'next/navigation'
-import { X, User } from 'lucide-react'
+import { X, User, History, Activity } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
@@ -30,6 +30,11 @@ export default function UserSidebar({ open, onClose }: UserSidebarProps) {
     router.push('/profile')
   }
 
+  const handleHistoryClick = () => {
+    onClose()
+    router.push('/history')
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Overlay */}
@@ -51,14 +56,30 @@ export default function UserSidebar({ open, onClose }: UserSidebarProps) {
             <User size={20} />
             Profile
           </button>
+          <button
+            className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-blue-100 text-base font-medium text-blue-800 transition"
+            onClick={handleHistoryClick}
+          >
+            <History size={20} />
+            Usage History
+          </button>
           {isAdmin && (
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-green-100 text-base font-medium text-green-800 transition"
-              onClick={onClose}
-            >
-              <span role="img" aria-label="admin">🛡️</span> Admin Dashboard
-            </Link>
+            <>
+              <Link
+                href="/admin"
+                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-green-100 text-base font-medium text-green-800 transition"
+                onClick={onClose}
+              >
+                <span role="img" aria-label="admin">🛡️</span> Admin Dashboard
+              </Link>
+              <Link
+                href="/admin/user-activity"
+                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-yellow-100 text-base font-medium text-yellow-700 transition"
+                onClick={onClose}
+              >
+                <Activity size={20} /> User Activity
+              </Link>
+            </>
           )}
         </nav>
       </aside>

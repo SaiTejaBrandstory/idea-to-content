@@ -9,9 +9,16 @@ interface TopicGeneratorProps {
   updateFormData: (updates: Partial<BlogFormData>) => void
   generatedTitles: string[]
   setGeneratedTitles: (titles: string[]) => void
+  currentSessionId: string | null
+  sessionSteps: {
+    titleGenerated: boolean
+    blogGenerated: boolean
+    humanized: boolean
+  }
+  setSessionSteps: (steps: any) => void
 }
 
-export default function TopicGenerator({ formData, updateFormData, generatedTitles, setGeneratedTitles }: TopicGeneratorProps) {
+export default function TopicGenerator({ formData, updateFormData, generatedTitles, setGeneratedTitles, currentSessionId, sessionSteps, setSessionSteps }: TopicGeneratorProps) {
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState('')
   const [cost, setCost] = useState<string | null>(null)
@@ -81,6 +88,16 @@ export default function TopicGenerator({ formData, updateFormData, generatedTitl
 
 
   const generateTitles = async () => {
+    if (!currentSessionId) {
+      setError('Please start a new blog first')
+      return
+    }
+
+    if (sessionSteps.titleGenerated) {
+      setError('Titles have already been generated in this blog')
+      return
+    }
+
     if (formData.keywords.length === 0) {
       setError('Please add keywords first')
       return
@@ -104,6 +121,8 @@ export default function TopicGenerator({ formData, updateFormData, generatedTitl
           blogType: formData.blogType,
           apiProvider: formData.apiProvider,
           model: formData.model,
+          tone: formData.tone,
+          sessionId: currentSessionId
         }),
       })
 
@@ -127,6 +146,9 @@ export default function TopicGenerator({ formData, updateFormData, generatedTitl
       } else {
         setCost(null)
       }
+
+      // Mark titles as generated in session
+      setSessionSteps((prev: any) => ({ ...prev, titleGenerated: true }))
     } catch (error) {
       console.error('Error generating titles:', error)
       setError('Failed to generate titles. Please try again.')
@@ -158,16 +180,26 @@ export default function TopicGenerator({ formData, updateFormData, generatedTitl
 
   return (
     <div className="space-y-6">
-      <div className="text-center">
-        <div className="flex items-center justify-center mb-3">
-          <Lightbulb className="w-5 h-5 text-black mr-2" />
-          <h2 className="heading-2 text-black">
-            Generate Blog Titles
-          </h2>
+      {!currentSessionId ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🔒</div>
+          <h2 className="heading-2 text-gray-600 mb-4">Blog Creation Required</h2>
+          <p className="body-text text-gray-500 mb-6">
+            Please start a new blog to begin generating titles.
+          </p>
         </div>
-        <p className="body-text text-gray-600 max-w-lg mx-auto">
-          Generate compelling titles based on your keywords and blog type using the selected model.
-        </p>
+      ) : (
+        <>
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-3">
+              <Lightbulb className="w-5 h-5 text-black mr-2" />
+              <h2 className="heading-2 text-black">
+                Generate Blog Titles
+              </h2>
+            </div>
+            <p className="body-text text-gray-600 max-w-lg mx-auto">
+              Generate compelling titles based on your keywords and blog type using the selected model.
+            </p>
         
         {/* Model Information */}
         <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
@@ -311,6 +343,8 @@ export default function TopicGenerator({ formData, updateFormData, generatedTitl
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   )
 } 

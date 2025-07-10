@@ -46,8 +46,8 @@ BEGIN
   VALUES (
     NEW.id,
     NEW.email,
-    NEW.raw_user_meta_data->>'full_name',
-    NEW.raw_user_meta_data->>'avatar_url',
+    '', -- Default empty string for full_name
+    '', -- Default empty string for avatar_url
     false,
     false
   );

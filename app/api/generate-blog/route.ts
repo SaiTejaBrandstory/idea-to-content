@@ -3,6 +3,8 @@ import OpenAI from 'openai'
 import Together from 'together-ai'
 import { BlogFormData, BlogContent } from '@/types/blog'
 import { processReferences } from '@/lib/reference-processor'
+import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { getSessionId } from '@/lib/session-manager'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -20,7 +22,7 @@ const getTogetherClient = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    const formData: BlogFormData = await request.json()
+    const { sessionId, ...formData }: BlogFormData & { sessionId?: string } = await request.json()
     
     console.log('[generate-blog] Received form data:', {
       selectedTitle: formData.selectedTitle,
@@ -109,12 +111,39 @@ export async function POST(request: NextRequest) {
         typeInstructions = 'Write in an educational and comprehensive style, using subheadings and detailed explanations.'
     }
 
+    // Tone-specific instructions
+    const toneInstructions = {
+      'Formal': 'Write in a polished, respectful tone using precise language suitable for academic writing or business reports.',
+      'Professional': 'Write in a clear, confident, and courteous tone suitable for business emails and proposals.',
+      'Diplomatic': 'Write in a tactful, neutral tone that avoids offense, suitable for conflict resolution or HR communications.',
+      'Objective': 'Write in a fact-based, unbiased tone suitable for news summaries and data reports.',
+      'Friendly': 'Write in a warm, welcoming, conversational tone suitable for onboarding messages and customer support.',
+      'Casual': 'Write in a relaxed, informal tone like chatting with a friend.',
+      'Playful': 'Write in a fun, humorous tone, sometimes silly, suitable for social media and kids\' content.',
+      'Optimistic': 'Write in an encouraging, upbeat, hopeful tone.',
+      'Empathetic': 'Write in a tone sensitive to the reader\'s emotions, suitable for apologies and support messages.',
+      'Inspirational': 'Write in an uplifting, motivational tone suitable for speeches and self-help content.',
+      'Passionate': 'Write with strong, enthusiastic emotion about the topic.',
+      'Urgent': 'Write in a pressing, action-oriented tone that calls for immediate attention.',
+      'Educational': 'Write in a clear, instructive tone, often step-by-step, suitable for tutorials and explainers.',
+      'Analytical': 'Write in a detailed, logical tone, often including comparisons or breakdowns.',
+      'Technical': 'Write using specialized vocabulary with precision, suitable for manuals and coding documentation.',
+      'Neutral': 'Write in a balanced tone with no strong emotional cues.',
+      'Narrative': 'Write in a storytelling style with pacing and character development.',
+      'Dramatic': 'Write in a tense, emotional, intense tone suitable for fiction or scripts.',
+      'Witty': 'Write in a clever tone, often using wordplay or sarcasm.',
+      'Poetic': 'Write in a lyrical, expressive tone using rhythm or metaphor.'
+    }
+
+    const selectedToneInstruction = toneInstructions[formData.tone.subtype as keyof typeof toneInstructions] || 'Write in a professional and engaging tone.'
+
     const prompt = `Write a complete ${formData.blogType.toLowerCase()} blog post with the following specifications:
 
 Title: ${formData.selectedTitle}
 Keywords: ${formData.keywords.join(', ')}
 Target Word Count: ${formData.wordCount}
 Number of Paragraphs: ${paragraphs}
+Writing Tone: ${formData.tone.subtype} (${formData.tone.type})
 
 ${referenceContext ? `Reference Context:\n${referenceContext}\n` : ''}
 
@@ -128,8 +157,9 @@ Requirements:
 7. Make the content informative, engaging, and valuable to readers
 8. Ensure the total word count is at least ${minWordCount} words. Do not finish until you reach this minimum. Expand on each section with detailed examples, explanations, and subheadings as needed. Use subheadings (##, ###) where appropriate for clarity and structure.
 9. ${typeInstructions}
-10. If you finish before reaching the minimum word count, continue writing more content in the same style. Do not summarize or conclude early. Keep expanding until the minimum is reached.
-${extraParagraphInstruction ? `11. ${extraParagraphInstruction}` : ''}
+10. ${selectedToneInstruction}
+11. If you finish before reaching the minimum word count, continue writing more content in the same style. Do not summarize or conclude early. Keep expanding until the minimum is reached.
+${extraParagraphInstruction ? `12. ${extraParagraphInstruction}` : ''}
 
 Format your response as follows:
 
@@ -147,6 +177,8 @@ CONCLUSION:
 
 CALL TO ACTION:
 [Your call to action here]`
+
+    console.log('[generate-blog] FINAL PROMPT:', prompt)
 
     let completion: any
     let usage = null
@@ -298,11 +330,11 @@ CALL TO ACTION:
 
       blogContent = {
         title: formData.selectedTitle,
-        metaDescription: metaDescription || 'SEO-optimized meta description for this blog post',
-        intro: intro || 'Introduction paragraph for the blog post',
-        body: body ? body.split(/\n\n+/).filter((p: string) => p.trim()) : ['Body paragraph for the blog post'],
-        conclusion: conclusion || 'Conclusion paragraph for the blog post',
-        cta: cta || 'Call to action for the blog post'
+        metaDescription: metaDescription || '',
+        intro: intro || '',
+        body: body ? body.split(/\n\n+/).filter((p: string) => p.trim()) : [],
+        conclusion: conclusion || '',
+        cta: cta || ''
       };
 
       // If parsing failed, create a fallback structure
@@ -311,22 +343,22 @@ CALL TO ACTION:
         const paragraphs = content.split(/\n\n+/).filter((p: string) => p.trim());
         if (paragraphs.length >= 3) {
           blogContent = {
-            title: formData.selectedTitle,
-            metaDescription: 'SEO-optimized meta description for this blog post',
-            intro: paragraphs[0]?.trim() || 'Introduction paragraph',
+            title: formData.selectedTitle || '',
+            metaDescription: '',
+            intro: '',
             body: paragraphs.slice(1, -1).map((p: string) => p.trim()).filter(Boolean),
-            conclusion: paragraphs[paragraphs.length - 1]?.trim() || 'Conclusion paragraph',
-            cta: 'Call to action for the blog post'
+            conclusion: paragraphs[paragraphs.length - 1]?.trim() || '',
+            cta: ''
           };
         } else {
           // Last resort - treat entire content as body
           blogContent = {
-            title: formData.selectedTitle,
-            metaDescription: 'SEO-optimized meta description for this blog post',
-            intro: 'Introduction paragraph for the blog post',
-            body: [content.trim()],
-            conclusion: 'Conclusion paragraph for the blog post',
-            cta: 'Call to action for the blog post'
+            title: formData.selectedTitle || '',
+            metaDescription: '',
+            intro: '',
+            body: [content.trim() || ''],
+            conclusion: '',
+            cta: ''
           };
         }
       }
@@ -334,12 +366,12 @@ CALL TO ACTION:
       console.error('Failed to parse blog content:', parseError);
       // Create a fallback structure
       blogContent = {
-        title: formData.selectedTitle,
-        metaDescription: 'SEO-optimized meta description for this blog post',
-        intro: 'Introduction paragraph for the blog post',
-        body: [content.trim()],
-        conclusion: 'Conclusion paragraph for the blog post',
-        cta: 'Call to action for the blog post'
+        title: formData.selectedTitle || '',
+        metaDescription: '',
+        intro: '',
+        body: [content.trim() || ''],
+        conclusion: '',
+        cta: ''
       };
     }
 
@@ -349,6 +381,120 @@ CALL TO ACTION:
     let tooShort = false
     if (minWordCount && actualWordCount < minWordCount) {
       tooShort = true
+    }
+
+    // Calculate cost for history tracking
+    let totalCostUsd = 0
+    let totalCostInr = 0
+    let inputPricePerToken = 0
+    let outputPricePerToken = 0
+    let pricingUnits = 'per_1K_tokens'
+
+    if (usage) {
+      if (formData.apiProvider === 'openai') {
+        const pricing = formData.selectedModel?.pricing || { input: 0.005, output: 0.015 }
+        inputPricePerToken = pricing.input / 1000
+        outputPricePerToken = pricing.output / 1000
+        pricingUnits = 'per_1K_tokens'
+        totalCostUsd = (usage.prompt_tokens * pricing.input / 1000) + (usage.completion_tokens * pricing.output / 1000)
+      } else {
+        const pricing = formData.selectedModel?.pricing || { input: 0.25, output: 0.35 }
+        inputPricePerToken = pricing.input / 1000000
+        outputPricePerToken = pricing.output / 1000000
+        pricingUnits = 'per_1M_tokens'
+        totalCostUsd = (usage.prompt_tokens * pricing.input / 1000000) + (usage.completion_tokens * pricing.output / 1000000)
+      }
+      totalCostInr = totalCostUsd * 83
+    }
+
+    // Save to history (async, don't wait for it)
+    try {
+      const allText = [blogContent.intro, ...(Array.isArray(blogContent.body) ? blogContent.body : [blogContent.body]), blogContent.conclusion, blogContent.cta || ''].join(' ')
+      
+      const historyData = {
+        operation_type: 'blog_generation',
+        api_provider: formData.apiProvider,
+        model_id: formData.model,
+        model_name: formData.selectedModel?.name || formData.model,
+        keywords: formData.keywords,
+        blog_type: formData.blogType,
+        selected_title: formData.selectedTitle,
+        word_count: formData.wordCount,
+        tone_type: formData.tone?.type || null,
+        tone_subtype: formData.tone?.subtype || null,
+        temperature: formData.temperature,
+        paragraphs: formData.paragraphs,
+        input_tokens: usage?.prompt_tokens || 0,
+        output_tokens: usage?.completion_tokens || 0,
+        total_tokens: usage ? usage.prompt_tokens + usage.completion_tokens : 0,
+        input_price_per_token: inputPricePerToken,
+        output_price_per_token: outputPricePerToken,
+        pricing_units: pricingUnits,
+        input_cost_usd: usage ? (usage.prompt_tokens * inputPricePerToken) : 0,
+        output_cost_usd: usage ? (usage.completion_tokens * outputPricePerToken) : 0,
+        total_cost_usd: totalCostUsd,
+        total_cost_inr: totalCostInr,
+        generated_content_preview: allText.substring(0, 500),
+        content_length: allText.length,
+        // Additional tracking fields
+        references_files: formData.references.files.length > 0 ? formData.references.files.map(f => f.name) : [],
+        references_urls: formData.references.urls,
+        references_custom_text: formData.references.customText || null,
+        setup_step: 'blog_generation',
+        step_number: 6
+      }
+
+      // Save history directly to database instead of making HTTP request
+      const supabase = createServerSupabaseClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (user) {
+        try {
+          await supabase
+            .from('usage_history')
+            .insert({
+              user_id: user.id,
+              session_id: sessionId || `session_${user.id}_${Math.floor(Date.now() / (30 * 60 * 1000))}`,
+              operation_type: 'blog_generation',
+              api_provider: formData.apiProvider,
+              model_id: formData.model,
+              model_name: formData.selectedModel?.name || formData.model,
+              keywords: formData.keywords,
+              blog_type: formData.blogType,
+              selected_title: formData.selectedTitle,
+              word_count: formData.wordCount,
+              tone_type: formData.tone?.type || null,
+              tone_subtype: formData.tone?.subtype || null,
+              temperature: formData.temperature,
+              paragraphs: formData.paragraphs,
+              input_tokens: usage?.prompt_tokens || 0,
+              output_tokens: usage?.completion_tokens || 0,
+              total_tokens: usage ? usage.prompt_tokens + usage.completion_tokens : 0,
+              input_price_per_token: inputPricePerToken,
+              output_price_per_token: outputPricePerToken,
+              pricing_units: pricingUnits,
+              input_cost_usd: usage ? (usage.prompt_tokens * inputPricePerToken) : 0,
+              output_cost_usd: usage ? (usage.completion_tokens * outputPricePerToken) : 0,
+              total_cost_usd: totalCostUsd,
+              total_cost_inr: totalCostInr,
+              generated_content_full: JSON.stringify(blogContent),
+              generated_content_preview: allText.substring(0, 500),
+              content_length: allText.length,
+              references_files: formData.references.files.length > 0 ? formData.references.files.map(f => f.name) : [],
+              references_urls: formData.references.urls,
+              references_custom_text: formData.references.customText || null,
+              setup_step: 'blog_generation',
+              step_number: 6,
+              ip_address: request.headers.get('x-forwarded-for') || request.ip,
+              user_agent: request.headers.get('user-agent')
+            })
+          console.log('History saved successfully')
+        } catch (err: any) {
+          console.error('Failed to save history:', err)
+        }
+      }
+    } catch (error) {
+      console.error('Error saving history:', error)
     }
 
     // Return token usage and tooShort flag if available
