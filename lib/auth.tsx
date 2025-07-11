@@ -23,43 +23,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session with shorter timeout
     const getSession = async () => {
+      console.log('[Auth] Starting session fetch...')
       let didFinish = false
       const timeout = setTimeout(() => {
         if (!didFinish) {
-          console.warn('Session fetch timed out, clearing session')
+          console.warn('[Auth] Session fetch timed out, clearing session')
           setSession(null)
           setUser(null)
           setLoading(false)
         }
-      }, 3000) // Reduced from 5000ms to 3000ms
+      }, 5000) // Increased timeout to 5 seconds
       
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
+        console.log('[Auth] Session fetch result:', { hasSession: !!session, hasUser: !!session?.user, error })
         
         if (error) {
-          console.error('Error getting session:', error)
-          // Clear any corrupted session data
-          await supabase.auth.signOut()
-          setSession(null)
-          setUser(null)
+          console.error('[Auth] Error getting session:', error)
+          // Don't clear session on network errors, just set loading to false
+          setLoading(false)
+          return
         } else if (session?.user) {
-          // Validate the session by checking if user exists
-          const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('id')
-            .eq('id', session.user.id)
-            .single()
+          console.log('[Auth] Setting session and user immediately')
+          // Set session and user immediately
+          setSession(session)
+          setUser(session.user)
           
-          if (userError || !userData) {
-            console.error('User not found in database, clearing session')
-            await supabase.auth.signOut()
-            setSession(null)
-            setUser(null)
-          } else {
-            setSession(session)
-            setUser(session.user)
+          // Then validate the user exists in database (but don't clear session if it fails)
+          try {
+            console.log('[Auth] Validating user in database...')
+            const { data: userData, error: userError } = await supabase
+              .from('users')
+              .select('id')
+              .eq('id', session.user.id)
+              .single()
+            
+            if (userError) {
+              console.warn('[Auth] User not found in database, but keeping session:', userError)
+              // Don't clear session, just log the warning
+            } else {
+              console.log('[Auth] User validated successfully')
+            }
+          } catch (validationError) {
+            console.warn('[Auth] Error validating user in database, but keeping session:', validationError)
+            // Don't clear session on validation errors
           }
         } else {
+          console.log('[Auth] No session found')
           setSession(null)
           setUser(null)
         }
@@ -68,13 +78,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false)
         clearTimeout(timeout)
       } catch (err) {
-        console.error('Error in getSession:', err)
+        console.error('[Auth] Error in getSession:', err)
         didFinish = true
         setLoading(false)
         clearTimeout(timeout)
-        // Clear session on error
-        setSession(null)
-        setUser(null)
+        // Don't clear session on general errors, just set loading to false
       }
     }
 
@@ -83,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.id)
+        console.log('[Auth] Auth state changed:', event, session?.user?.id)
         
         if (event === 'SIGNED_OUT') {
           setSession(null)

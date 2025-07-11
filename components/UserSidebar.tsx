@@ -1,5 +1,5 @@
 import { useRouter } from 'next/navigation'
-import { X, User, History, Activity } from 'lucide-react'
+import { X, User, History, Activity, MessageSquare, Users } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
@@ -35,6 +35,16 @@ export default function UserSidebar({ open, onClose }: UserSidebarProps) {
     router.push('/history')
   }
 
+  const handleChatHistoryClick = () => {
+    onClose()
+    router.push('/profile/chat-history')
+  }
+
+  const handleAdminChatHistoryClick = () => {
+    onClose()
+    router.push('/admin/chat-history')
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Overlay */}
@@ -63,6 +73,13 @@ export default function UserSidebar({ open, onClose }: UserSidebarProps) {
             <History size={20} />
             Usage History
           </button>
+          <button
+            className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-purple-100 text-base font-medium text-purple-800 transition"
+            onClick={handleChatHistoryClick}
+          >
+            <MessageSquare size={20} />
+            Chat History
+          </button>
           {isAdmin && (
             <>
               <Link
@@ -79,6 +96,12 @@ export default function UserSidebar({ open, onClose }: UserSidebarProps) {
               >
                 <Activity size={20} /> User Activity
               </Link>
+              <button
+                className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-indigo-100 text-base font-medium text-indigo-700 transition"
+                onClick={handleAdminChatHistoryClick}
+              >
+                <Users size={20} /> All Chat History
+              </button>
             </>
           )}
         </nav>

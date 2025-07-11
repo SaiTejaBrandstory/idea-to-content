@@ -29,7 +29,12 @@ export async function middleware(request: NextRequest) {
 
   // Refresh session if expired - required for Server Components
   // https://supabase.com/docs/guides/auth/auth-helpers/nextjs#managing-session-with-middleware
-  await supabase.auth.getUser()
+  try {
+    await supabase.auth.getUser()
+  } catch (error) {
+    console.error('Middleware auth error:', error)
+    // Don't redirect on auth errors, just continue
+  }
 
   return supabaseResponse
 }

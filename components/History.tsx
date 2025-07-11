@@ -86,6 +86,8 @@ export default function History() {
   const [error, setError] = useState('')
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set())
   const [showContent, setShowContent] = useState<Set<string>>(new Set())
+  const [loadingSessions, setLoadingSessions] = useState<Set<string>>(new Set())
+  const [loadingContent, setLoadingContent] = useState<Set<string>>(new Set())
   
   // No filters needed - show all operations
 
@@ -224,7 +226,12 @@ export default function History() {
     }
   }
 
-  const toggleSession = (sessionId: string) => {
+  const toggleSession = async (sessionId: string) => {
+    setLoadingSessions(prev => new Set(prev).add(sessionId))
+    
+    // Simulate a small delay to show loading state
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
     const newExpanded = new Set(expandedSessions)
     if (newExpanded.has(sessionId)) {
       newExpanded.delete(sessionId)
@@ -232,9 +239,19 @@ export default function History() {
       newExpanded.add(sessionId)
     }
     setExpandedSessions(newExpanded)
+    setLoadingSessions(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(sessionId)
+      return newSet
+    })
   }
 
-  const toggleContent = (sessionId: string) => {
+  const toggleContent = async (sessionId: string) => {
+    setLoadingContent(prev => new Set(prev).add(sessionId))
+    
+    // Simulate a small delay to show loading state
+    await new Promise(resolve => setTimeout(resolve, 150))
+    
     const newShowContent = new Set(showContent)
     if (newShowContent.has(sessionId)) {
       newShowContent.delete(sessionId)
@@ -242,6 +259,11 @@ export default function History() {
       newShowContent.add(sessionId)
     }
     setShowContent(newShowContent)
+    setLoadingContent(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(sessionId)
+      return newSet
+    })
   }
 
   const markdownComponents = {
@@ -404,9 +426,12 @@ export default function History() {
                   <div className="flex items-center space-x-3">
                     <button
                       onClick={() => toggleSession(session.session_id)}
-                      className="flex items-center space-x-2 text-left hover:bg-gray-50 p-1 rounded"
+                      disabled={loadingSessions.has(session.session_id)}
+                      className="flex items-center space-x-2 text-left hover:bg-gray-50 p-1 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {expandedSessions.has(session.session_id) ? (
+                      {loadingSessions.has(session.session_id) ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                      ) : expandedSessions.has(session.session_id) ? (
                         <ChevronDown className="w-4 h-4 text-gray-500" />
                       ) : (
                         <ChevronRight className="w-4 h-4 text-gray-500" />
@@ -438,9 +463,12 @@ export default function History() {
                     </div>
                     <button
                       onClick={() => toggleContent(session.session_id)}
-                      className="flex items-center space-x-1 text-xs text-gray-500 hover:text-gray-700"
+                      disabled={loadingContent.has(session.session_id)}
+                      className="flex items-center space-x-1 text-xs text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {showContent.has(session.session_id) ? (
+                      {loadingContent.has(session.session_id) ? (
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-500"></div>
+                      ) : showContent.has(session.session_id) ? (
                         <>
                           <EyeOff className="w-3 h-3" />
                           <span>Hide Content</span>

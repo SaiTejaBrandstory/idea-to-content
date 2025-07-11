@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useAuth } from '@/lib/auth'
+import { useRouter } from 'next/navigation'
 
 interface User {
   id: string
@@ -14,46 +16,89 @@ interface User {
 }
 
 export default function AdminDashboard() {
+  const { user, loading } = useAuth()
+  const router = useRouter()
   const [users, setUsers] = useState<User[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loadingUsers, setLoadingUsers] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  const fetchUsers = async () => {
-    setLoading(true)
-    setError(null)
-    const res = await fetch('/api/admin/users')
-    if (!res.ok) {
-      setError('You are not authorized to view this page.')
-      setLoading(false)
+  useEffect(() => {
+    if (loading) return
+    
+    if (!user) {
+      router.push('/')
       return
     }
-    const data = await res.json()
-    setUsers(data.users)
-    setLoading(false)
-  }
-
-  useEffect(() => {
+    
     fetchUsers()
-  }, [])
+  }, [user, loading, router])
+
+  const fetchUsers = async () => {
+    try {
+      setLoadingUsers(true)
+      setError(null)
+      const res = await fetch('/api/admin/users')
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          setError('You are not authorized to view this page.')
+          setLoadingUsers(false)
+          return
+        }
+        throw new Error('Failed to fetch users')
+      }
+      const data = await res.json()
+      setUsers(data.users)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setLoadingUsers(false)
+    }
+  }
 
   const handleApprove = async (userId: string, approve: boolean) => {
     setActionLoading(userId + approve)
-    const res = await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, approve })
-    })
-    setActionLoading(null)
-    if (res.ok) {
-      fetchUsers()
-    } else {
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, approve })
+      })
+      if (res.ok) {
+        fetchUsers()
+      } else {
+        alert('Failed to update user status')
+      }
+    } catch (err) {
       alert('Failed to update user status')
+    } finally {
+      setActionLoading(null)
     }
   }
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="loader"></div></div>
-  if (error) return <div className="min-h-screen flex items-center justify-center text-red-600 font-bold">{error}</div>
+  if (loading || loadingUsers) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-600"></div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-gray-600">Please sign in to access this page</div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-red-600 font-bold">{error}</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-white p-8">

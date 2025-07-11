@@ -637,7 +637,7 @@ export default function UserActivityPage() {
                                 <div className="bg-blue-50 px-4 py-3 rounded-t-lg border-b">
                                   <div className="flex items-center justify-between">
                                     <div>
-                                      <h4 className="font-medium text-blue-900">Session: {sessionId.slice(0, 12)}...</h4>
+                                      <h4 className="font-medium text-blue-900">Session: {sessionId?.slice(0, 12) || 'Unknown'}...</h4>
                                       <p className="text-xs text-blue-700">
                                         {sessionStart.toLocaleDateString('en-US', {
                                           year: 'numeric',
