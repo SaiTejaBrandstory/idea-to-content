@@ -353,7 +353,7 @@ export default function ChatPage() {
       {/* Sidebar */}
       {mounted && (
         <div className={`w-80 bg-white border-r border-gray-200 flex flex-col ${sidebarOpen ? 'block' : 'hidden'} md:block`}>
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 sticky top-0 z-10 bg-white">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Chat History</h2>
               <button
@@ -364,8 +364,8 @@ export default function ChatPage() {
               </button>
             </div>
           </div>
-          
-          <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {/* Scrollable chat history list */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin-sidebar" style={{ maxHeight: 'calc(100vh - 72px)' }}>
             {loadingSessions ? (
               <div className="space-y-2">
                 {[...Array(5)].map((_, i) => (
@@ -409,6 +409,20 @@ export default function ChatPage() {
               ))
             )}
           </div>
+          {/* Custom scrollbar styles for sidebar */}
+          <style jsx global>{`
+            .scrollbar-thin-sidebar::-webkit-scrollbar {
+              width: 8px;
+              background: transparent;
+            }
+            .scrollbar-thin-sidebar::-webkit-scrollbar-thumb {
+              background: #e5e7eb;
+              border-radius: 6px;
+            }
+            .scrollbar-thin-sidebar::-webkit-scrollbar-thumb:hover {
+              background: #c7c7c7;
+            }
+          `}</style>
         </div>
       )}
 
@@ -487,273 +501,273 @@ export default function ChatPage() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col">
-        {/* Chat messages area */}
-        <div ref={chatAreaRef} className="flex-1 overflow-y-auto scrollbar-thin px-2 md:px-8 py-2 space-y-2 text-sm" style={{ maxHeight: '100%', minHeight: 0 }}>
-          {messages.map((msg) => (
+      {/* Chat messages area */}
+      <div ref={chatAreaRef} className="flex-1 overflow-y-auto scrollbar-thin px-2 md:px-8 py-2 space-y-2 text-sm" style={{ maxHeight: '100%', minHeight: 0 }}>
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+          >
             <div
-              key={msg.id}
-              className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+              className={`max-w-3xl inline-block px-4 py-2 rounded-2xl shadow-md text-sm whitespace-pre-line ${
+                msg.sender === "user"
+                  ? "bg-gradient-to-br from-violet-500 to-violet-700 text-white rounded-br-md"
+                  : "bg-white text-gray-900 border border-gray-200 rounded-bl-md"
+              }`}
             >
-              <div
-                className={`max-w-3xl inline-block px-4 py-2 rounded-2xl shadow-md text-sm whitespace-pre-line ${
-                  msg.sender === "user"
-                    ? "bg-gradient-to-br from-violet-500 to-violet-700 text-white rounded-br-md"
-                    : "bg-white text-gray-900 border border-gray-200 rounded-bl-md"
-                }`}
-              >
-                <div className="mb-1">
-                  <span className="font-semibold text-[11px] mr-2">{msg.sender === "user" ? "You" : "AI"}</span>
-                  <span className="text-[11px] text-gray-400">[{msg.model} / {msg.api}]</span>
-                </div>
-                <div className="text-sm">
-                  <div className="chat-markdown">
-                    <ReactMarkdown
-                      rehypePlugins={[rehypeHighlight]}
-                      components={{
-                        code(props) {
-                          const { children, className } = props;
-                          // @ts-ignore
-                          const isInline = props.inline;
-                          return isInline ? (
-                            <code className="bg-gray-200 text-pink-700 px-1.5 py-0.5 rounded text-[13px] font-mono">{children}</code>
-                          ) : (
-                            <pre className="bg-gray-900 text-green-200 rounded-xl p-4 overflow-x-auto my-2 text-[13px] font-mono">
-                              <code {...props}>{children}</code>
-                            </pre>
-                          );
-                        }
-                      }}
-                    >
-                      {compactMarkdown(msg.text)}
-                    </ReactMarkdown>
-                  </div>
+              <div className="mb-1">
+                <span className="font-semibold text-[11px] mr-2">{msg.sender === "user" ? "You" : "AI"}</span>
+                <span className="text-[11px] text-gray-400">[{msg.model} / {msg.api}]</span>
+              </div>
+              <div className="text-sm">
+                <div className="chat-markdown">
+                  <ReactMarkdown
+                    rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      code(props) {
+                        const { children, className } = props;
+                        // @ts-ignore
+                        const isInline = props.inline;
+                        return isInline ? (
+                          <code className="bg-gray-200 text-pink-700 px-1.5 py-0.5 rounded text-[13px] font-mono">{children}</code>
+                        ) : (
+                          <pre className="bg-gray-900 text-green-200 rounded-xl p-4 overflow-x-auto my-2 text-[13px] font-mono">
+                            <code {...props}>{children}</code>
+                          </pre>
+                        );
+                      }
+                    }}
+                  >
+                    {compactMarkdown(msg.text)}
+                  </ReactMarkdown>
                 </div>
               </div>
             </div>
-          ))}
-          <div ref={chatBottomRef} />
-          {aiLoading && (
-            <div className="flex justify-start">
-              <div className="max-w-3xl inline-block px-4 py-2 rounded-2xl shadow-md text-sm bg-gray-100 text-gray-400 border border-gray-200 rounded-bl-md animate-pulse">
-                AI is typing...
-              </div>
+          </div>
+        ))}
+        <div ref={chatBottomRef} />
+        {aiLoading && (
+          <div className="flex justify-start">
+            <div className="max-w-3xl inline-block px-4 py-2 rounded-2xl shadow-md text-sm bg-gray-100 text-gray-400 border border-gray-200 rounded-bl-md animate-pulse">
+              AI is typing...
+            </div>
+          </div>
+        )}
+        {aiError && (
+          <div className="flex justify-start">
+            <div className="max-w-3xl inline-block px-4 py-2 rounded-2xl shadow-md text-sm bg-red-100 text-red-600 border border-red-200 rounded-bl-md">
+              {aiError}
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Custom thin scrollbar styles */}
+      <style jsx global>{`
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+          background: transparent;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: #d1d5db;
+          border-radius: 4px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+          background: #a3a3a3;
+        }
+        .shimmer {
+          background: linear-gradient(90deg, #f3f3f3 25%, #e5e7eb 50%, #f3f3f3 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.2s infinite linear;
+        }
+        @keyframes shimmer {
+          0% { background-position: 200% 0; }
+          100% { background-position: -200% 0; }
+        }
+        .chat-markdown {
+          line-height: 1.3;
+        }
+        .chat-markdown p,
+        .chat-markdown ul,
+        .chat-markdown ol,
+        .chat-markdown li,
+        .chat-markdown blockquote,
+        .chat-markdown h1,
+        .chat-markdown h2,
+        .chat-markdown h3,
+        .chat-markdown h4,
+        .chat-markdown h5,
+        .chat-markdown h6 {
+          margin: 0.05em 0 0.05em 0 !important;
+          min-height: 0;
+        }
+        .chat-markdown ul,
+        .chat-markdown ol {
+          padding-left: 1em;
+        }
+        .chat-markdown blockquote {
+          padding-left: 0.4em;
+          border-left: 2px solid #e5e7eb;
+          color: #6b7280;
+        }
+      `}</style>
+      {/* Model selection and input bar (compact, sticky at bottom) */}
+      <div className="sticky bottom-0 w-full bg-white border-t z-10">
+        <div className="flex flex-col sm:flex-row gap-2 items-center px-2 py-2 md:px-8 md:py-3">
+          {/* Error and loading states */}
+          {modelsError && !modelsLoading && (
+            <div className="w-full text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-2 text-center">
+              {modelsError}
             </div>
           )}
-          {aiError && (
-            <div className="flex justify-start">
-              <div className="max-w-3xl inline-block px-4 py-2 rounded-2xl shadow-md text-sm bg-red-100 text-red-600 border border-red-200 rounded-bl-md">
-                {aiError}
-              </div>
-            </div>
-          )}
-        </div>
-        {/* Custom thin scrollbar styles */}
-        <style jsx global>{`
-          .scrollbar-thin::-webkit-scrollbar {
-            width: 6px;
-            background: transparent;
-          }
-          .scrollbar-thin::-webkit-scrollbar-thumb {
-            background: #d1d5db;
-            border-radius: 4px;
-          }
-          .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-            background: #a3a3a3;
-          }
-          .shimmer {
-            background: linear-gradient(90deg, #f3f3f3 25%, #e5e7eb 50%, #f3f3f3 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.2s infinite linear;
-          }
-          @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-          }
-          .chat-markdown {
-            line-height: 1.3;
-          }
-          .chat-markdown p,
-          .chat-markdown ul,
-          .chat-markdown ol,
-          .chat-markdown li,
-          .chat-markdown blockquote,
-          .chat-markdown h1,
-          .chat-markdown h2,
-          .chat-markdown h3,
-          .chat-markdown h4,
-          .chat-markdown h5,
-          .chat-markdown h6 {
-            margin: 0.05em 0 0.05em 0 !important;
-            min-height: 0;
-          }
-          .chat-markdown ul,
-          .chat-markdown ol {
-            padding-left: 1em;
-          }
-          .chat-markdown blockquote {
-            padding-left: 0.4em;
-            border-left: 2px solid #e5e7eb;
-            color: #6b7280;
-          }
-        `}</style>
-        {/* Model selection and input bar (compact, sticky at bottom) */}
-        <div className="sticky bottom-0 w-full bg-white border-t z-10">
-          <div className="flex flex-col sm:flex-row gap-2 items-center px-2 py-2 md:px-8 md:py-3">
-            {/* Error and loading states */}
-            {modelsError && !modelsLoading && (
-              <div className="w-full text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-2 text-center">
-                {modelsError}
-              </div>
+          {/* Provider select */}
+          <div className="w-full sm:w-64 h-10 text-xs">
+            {modelsLoading ? (
+              <div className="w-full h-10 rounded border bg-gray-100 animate-pulse shimmer" />
+            ) : (
+              <Listbox value={provider} onChange={setProvider} disabled={modelsLoading}>
+                <div className="relative h-10">
+                  <Listbox.Button className="relative w-full h-10 cursor-pointer rounded border bg-white py-1 pl-3 pr-8 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs min-w-[12rem]">
+                    <span className="block truncate">{provider.name}</span>
+                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                      <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                    </span>
+                  </Listbox.Button>
+                  <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+                    <Listbox.Options className="absolute z-10 bottom-full right-0 origin-top-right mb-1 max-h-60 w-64 min-w-[12rem] overflow-auto rounded bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      {PROVIDERS.map((p) => (
+                        <Listbox.Option
+                          key={p.id}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-violet-100 text-violet-900" : "text-gray-900"}`
+                          }
+                          value={p}
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{p.name}</span>
+                              {selected ? (
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
+                                  <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                              ) : null}
+                            </>
+                          )}
+                        </Listbox.Option>
+                      ))}
+                    </Listbox.Options>
+                  </Transition>
+                </div>
+              </Listbox>
             )}
-            {/* Provider select */}
-            <div className="w-full sm:w-64 h-10 text-xs">
-              {modelsLoading ? (
-                <div className="w-full h-10 rounded border bg-gray-100 animate-pulse shimmer" />
-              ) : (
-                <Listbox value={provider} onChange={setProvider} disabled={modelsLoading}>
-                  <div className="relative h-10">
-                    <Listbox.Button className="relative w-full h-10 cursor-pointer rounded border bg-white py-1 pl-3 pr-8 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs min-w-[12rem]">
-                      <span className="block truncate">{provider.name}</span>
-                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                        <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                      </span>
-                    </Listbox.Button>
-                    <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
-                      <Listbox.Options className="absolute z-10 bottom-full right-0 origin-top-right mb-1 max-h-60 w-64 min-w-[12rem] overflow-auto rounded bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        {PROVIDERS.map((p) => (
-                          <Listbox.Option
-                            key={p.id}
-                            className={({ active }) =>
-                              `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-violet-100 text-violet-900" : "text-gray-900"}`
-                            }
-                            value={p}
-                          >
-                            {({ selected }) => (
-                              <>
-                                <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{p.name}</span>
-                                {selected ? (
-                                  <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
-                                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                                  </span>
-                                ) : null}
-                              </>
-                            )}
-                          </Listbox.Option>
-                        ))}
-                      </Listbox.Options>
-                    </Transition>
-                  </div>
-                </Listbox>
-              )}
-            </div>
-            {/* Model select */}
-            <div className="w-full sm:w-64 h-10 text-xs">
-              {modelsLoading ? (
-                <div className="w-full h-10 rounded border bg-gray-100 animate-pulse shimmer" />
-              ) : (
-                <Listbox value={model} onChange={m => { setModel(m); setModelInfo(m); }} disabled={modelsLoading || featuredModels.length + regularModels.length === 0}>
-                  <div className="relative h-10">
-                    <Listbox.Button className="relative w-full h-10 cursor-pointer rounded border bg-white py-1 pl-3 pr-8 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs min-w-[12rem]">
-                      <span className="block truncate">{model ? (model.name || model.id) : "Select model"}</span>
-                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                        <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                      </span>
-                    </Listbox.Button>
-                    <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
-                      <Listbox.Options className="absolute z-10 bottom-full right-0 origin-top-right mb-1 max-h-60 w-64 min-w-[12rem] overflow-auto rounded bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        {featuredModels.length > 0 && (
+          </div>
+          {/* Model select */}
+          <div className="w-full sm:w-64 h-10 text-xs">
+            {modelsLoading ? (
+              <div className="w-full h-10 rounded border bg-gray-100 animate-pulse shimmer" />
+            ) : (
+              <Listbox value={model} onChange={m => { setModel(m); setModelInfo(m); }} disabled={modelsLoading || featuredModels.length + regularModels.length === 0}>
+                <div className="relative h-10">
+                  <Listbox.Button className="relative w-full h-10 cursor-pointer rounded border bg-white py-1 pl-3 pr-8 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs min-w-[12rem]">
+                    <span className="block truncate">{model ? (model.name || model.id) : "Select model"}</span>
+                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                      <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                    </span>
+                  </Listbox.Button>
+                  <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+                    <Listbox.Options className="absolute z-10 bottom-full right-0 origin-top-right mb-1 max-h-60 w-64 min-w-[12rem] overflow-auto rounded bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                      {featuredModels.length > 0 && (
                           <>
                             <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">Featured Models</div>
-                            {featuredModels.map((m) => (
-                              <Listbox.Option
-                                key={m.id}
-                                className={({ active }) =>
+                      {featuredModels.map((m) => (
+                        <Listbox.Option
+                          key={m.id}
+                          className={({ active }) =>
                                   `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-violet-100 text-violet-900" : "text-gray-900"}`
-                                }
-                                value={m}
-                              >
-                                {({ selected }) => (
-                                  <>
-                                    <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{m.name || m.id}</span>
-                                    {selected ? (
-                                      <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
-                                        <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                                      </span>
-                                    ) : null}
-                                  </>
-                                )}
-                              </Listbox.Option>
-                            ))}
+                          }
+                          value={m}
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{m.name || m.id}</span>
+                              {selected ? (
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
+                                  <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                              ) : null}
+                            </>
+                          )}
+                        </Listbox.Option>
+                      ))}
                           </>
                         )}
-                        {regularModels.length > 0 && (
+                      {regularModels.length > 0 && (
                           <>
                             <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">All Models</div>
-                            {regularModels.map((m) => (
-                              <Listbox.Option
-                                key={m.id}
-                                className={({ active }) =>
-                                  `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-gray-100 text-gray-900" : "text-gray-900"}`
-                                }
-                                value={m}
-                              >
-                                {({ selected }) => (
-                                  <>
-                                    <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{m.name || m.id}</span>
-                                    {selected ? (
-                                      <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
-                                        <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                                      </span>
-                                    ) : null}
-                                  </>
-                                )}
-                              </Listbox.Option>
-                            ))}
+                      {regularModels.map((m) => (
+                        <Listbox.Option
+                          key={m.id}
+                          className={({ active }) =>
+                            `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-gray-100 text-gray-900" : "text-gray-900"}`
+                          }
+                          value={m}
+                        >
+                          {({ selected }) => (
+                            <>
+                              <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{m.name || m.id}</span>
+                              {selected ? (
+                                <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
+                                  <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                              ) : null}
+                            </>
+                          )}
+                        </Listbox.Option>
+                      ))}
                           </>
                         )}
-                      </Listbox.Options>
-                    </Transition>
-                  </div>
-                </Listbox>
-              )}
-            </div>
-            {/* Chat input */}
-            <form
-              className="flex-1 flex items-end gap-2 w-full"
-              onSubmit={e => {
-                e.preventDefault();
-                handleSend();
+                    </Listbox.Options>
+                  </Transition>
+                </div>
+              </Listbox>
+            )}
+          </div>
+          {/* Chat input */}
+          <form
+            className="flex-1 flex items-end gap-2 w-full"
+            onSubmit={e => {
+              e.preventDefault();
+              handleSend();
+            }}
+          >
+            <textarea
+              ref={textareaRef}
+              className="flex-1 w-full p-2 border rounded resize-none text-xs min-h-[40px] max-h-[144px]"
+              rows={1}
+              placeholder="Type your message..."
+              value={input}
+              onChange={e => {
+                setInput(e.target.value);
+                const ta = e.target as HTMLTextAreaElement;
+                ta.style.height = 'auto';
+                ta.style.height = Math.min(ta.scrollHeight, 144) + 'px';
               }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              style={{ minHeight: '40px', maxHeight: '144px', overflowY: 'auto' }}
+              autoFocus
+            />
+            <button
+              type="submit"
+              className="bg-violet-600 text-white px-4 h-10 rounded hover:bg-violet-700 transition text-xs"
+              disabled={!input.trim() || !modelInfo}
             >
-              <textarea
-                ref={textareaRef}
-                className="flex-1 w-full p-2 border rounded resize-none text-xs min-h-[40px] max-h-[144px]"
-                rows={1}
-                placeholder="Type your message..."
-                value={input}
-                onChange={e => {
-                  setInput(e.target.value);
-                  const ta = e.target as HTMLTextAreaElement;
-                  ta.style.height = 'auto';
-                  ta.style.height = Math.min(ta.scrollHeight, 144) + 'px';
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                style={{ minHeight: '40px', maxHeight: '144px', overflowY: 'auto' }}
-                autoFocus
-              />
-              <button
-                type="submit"
-                className="bg-violet-600 text-white px-4 h-10 rounded hover:bg-violet-700 transition text-xs"
-                disabled={!input.trim() || !modelInfo}
-              >
-                Send
-              </button>
-            </form>
+              Send
+            </button>
+          </form>
           </div>
         </div>
       </div>
