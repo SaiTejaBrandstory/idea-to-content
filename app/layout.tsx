@@ -20,7 +20,6 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL('https://idea-to-content.com'),
   alternates: {
     canonical: '/',
   },
@@ -35,7 +34,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Idea to Content - AI Blog Generator',
     description: 'Generate complete blog content using AI with guided inputs and multiple formats. Create high-quality blog posts, articles, and content with advanced AI technology.',
-    url: 'https://idea-to-content.com',
+    url: '/',
     siteName: 'Idea to Content',
     images: [
       {
