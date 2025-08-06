@@ -211,20 +211,69 @@ CALL TO ACTION:
       console.log(`[generate-blog] Using Together.ai with model: ${formData.model}`)
       try {
         const together = getTogetherClient()
+        
+        // Enhanced prompt for Together AI to ensure structured output
+        const enhancedPrompt = `${prompt}
+
+🚨 CRITICAL WORD COUNT REQUIREMENT 🚨
+You MUST write EXACTLY ${minWordCount} words or MORE. This is MANDATORY.
+- Target: ${minWordCount} words minimum
+- Current requirement: ${minWordCount} words
+- Do NOT stop until you reach ${minWordCount} words
+- If you finish before ${minWordCount} words, CONTINUE writing more content
+- Add detailed examples, explanations, case studies, and subheadings
+- Expand each section with comprehensive details
+- Use bullet points, numbered lists, and detailed explanations
+- Include relevant statistics, quotes, and real-world examples
+- Do NOT summarize or conclude early
+- Keep writing until you reach ${minWordCount} words minimum
+
+📝 FORMAT REQUIREMENTS:
+You MUST follow this exact format structure. Do not deviate from this format:
+
+META DESCRIPTION:
+[Write meta description here - 150-160 characters]
+
+INTRODUCTION:
+[Write a comprehensive introduction paragraph here - make this detailed and engaging, at least 200-300 words]
+
+BODY:
+[Write extensive body paragraphs here, separated by double line breaks - this section should be the longest and contain the majority of your ${minWordCount} words. Include:
+- Multiple detailed paragraphs
+- Subheadings (##, ###) for organization
+- Bullet points and numbered lists
+- Real-world examples and case studies
+- Detailed explanations and analysis
+- Statistics and data points
+- Expert quotes and references
+- Step-by-step breakdowns
+- Comparison tables or lists
+- Detailed how-to instructions
+- Comprehensive coverage of all aspects
+- At least 8-10 substantial paragraphs for ${minWordCount} words]
+
+CONCLUSION:
+[Write a comprehensive conclusion paragraph here - at least 150-200 words]
+
+CALL TO ACTION:
+[Write call to action here]
+
+⚠️ REMINDER: You MUST reach ${minWordCount} words minimum. Count your words and ensure you meet this requirement.`
+        
         completion = await together.chat.completions.create({
           model: formData.model,
           messages: [
             {
               role: 'system',
-              content: 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
+              content: 'You are a professional content writer and SEO expert. You MUST follow the exact format structure provided by the user. Always include all required sections: META DESCRIPTION, INTRODUCTION, BODY, CONCLUSION, and CALL TO ACTION. Format your response exactly as specified. You MUST write comprehensive, detailed content that meets the specified word count requirements.'
             },
             {
               role: 'user',
-              content: prompt
+              content: enhancedPrompt
             }
           ],
           temperature: formData.temperature,
-          max_tokens: maxTokens,
+          max_tokens: Math.max(maxTokens, 8000), // Ensure enough tokens for 1500+ words
         })
         usage = completion.usage
       } catch (apiError: any) {
@@ -248,129 +297,124 @@ CALL TO ACTION:
     // Parse the structured text response
     let blogContent: BlogContent
     try {
-      // Split content by sections using a more compatible approach
-      const sections = content.split(/\n\n+/);
+      console.log('[generate-blog] Parsing content from:', formData.apiProvider);
       
-      // Extract sections using index-based approach instead of regex with 's' flag
-      const lines = content.split('\n');
-      let metaDescription = '';
-      let intro = '';
-      let body = '';
-      let conclusion = '';
-      let cta = '';
+      // Simplified and more robust parsing
+      const contentText = content.trim();
       
-      let currentSection = '';
-      let currentContent: string[] = [];
+      // Extract sections using regex patterns
+      const metaDescriptionMatch = contentText.match(/META DESCRIPTION:\s*\n([\s\S]*?)(?=\n\s*(?:INTRODUCTION|BODY|CONCLUSION|CALL TO ACTION):)/i);
+      const introMatch = contentText.match(/INTRODUCTION:\s*\n([\s\S]*?)(?=\n\s*(?:BODY|CONCLUSION|CALL TO ACTION):)/i);
+      const bodyMatch = contentText.match(/BODY:\s*\n([\s\S]*?)(?=\n\s*(?:CONCLUSION|CALL TO ACTION):)/i);
+      const conclusionMatch = contentText.match(/CONCLUSION:\s*\n([\s\S]*?)(?=\n\s*(?:CALL TO ACTION):)/i);
+      const ctaMatch = contentText.match(/CALL TO ACTION:\s*\n([\s\S]*?)(?=\n\s*$|$)/i);
       
-      for (const line of lines) {
-        const trimmedLine = line.trim();
-        if (trimmedLine === 'META DESCRIPTION:') {
-          if (currentSection && currentContent.length > 0) {
-            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
-            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
-            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
-            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
-            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
+      // Extract and clean the content
+      const metaDescription = metaDescriptionMatch ? metaDescriptionMatch[1].trim() : '';
+      const intro = introMatch ? introMatch[1].trim() : '';
+      const body = bodyMatch ? bodyMatch[1].trim() : '';
+      const conclusion = conclusionMatch ? conclusionMatch[1].trim() : '';
+      const cta = ctaMatch ? ctaMatch[1].trim() : '';
+
+      // Debug: Log parsed sections
+      console.log('[generate-blog] Parsed sections:', {
+        metaDescription: metaDescription.length,
+        intro: intro.length,
+        body: body.length,
+        conclusion: conclusion.length,
+        cta: cta.length
+      });
+
+      // If parsing failed, try fallback parsing
+      if (!metaDescription && !intro && !body && !conclusion) {
+        console.log('[generate-blog] Primary parsing failed, trying fallback...');
+        
+        // Fallback: Split by double newlines and try to identify sections
+        const sections = contentText.split(/\n\s*\n/);
+        let fallbackMetaDescription = '';
+        let fallbackIntro = '';
+        let fallbackBody = '';
+        let fallbackConclusion = '';
+        let fallbackCta = '';
+        
+        let currentSection = '';
+        for (const section of sections) {
+          const trimmedSection = section.trim();
+          const upperSection = trimmedSection.toUpperCase();
+          
+          if (upperSection.includes('META DESCRIPTION') || upperSection.includes('META')) {
+            fallbackMetaDescription = trimmedSection.replace(/^.*?META DESCRIPTION:?\s*/i, '').trim();
+          } else if (upperSection.includes('INTRODUCTION') || upperSection.includes('INTRO')) {
+            fallbackIntro = trimmedSection.replace(/^.*?INTRODUCTION:?\s*/i, '').trim();
+          } else if (upperSection.includes('BODY') || upperSection.includes('CONTENT')) {
+            fallbackBody = trimmedSection.replace(/^.*?BODY:?\s*/i, '').trim();
+          } else if (upperSection.includes('CONCLUSION') || upperSection.includes('CONCLUDE')) {
+            fallbackConclusion = trimmedSection.replace(/^.*?CONCLUSION:?\s*/i, '').trim();
+          } else if (upperSection.includes('CALL TO ACTION') || upperSection.includes('CTA')) {
+            fallbackCta = trimmedSection.replace(/^.*?CALL TO ACTION:?\s*/i, '').trim();
+          } else if (currentSection === 'BODY') {
+            fallbackBody += '\n\n' + trimmedSection;
+          } else if (!currentSection && trimmedSection.length > 50) {
+            // If no section identified, assume it's intro
+            fallbackIntro = trimmedSection;
           }
-          currentSection = 'META DESCRIPTION:';
-          currentContent = [];
-        } else if (trimmedLine === 'INTRODUCTION:') {
-          if (currentSection && currentContent.length > 0) {
-            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
-            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
-            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
-            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
-            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
-          }
-          currentSection = 'INTRODUCTION:';
-          currentContent = [];
-        } else if (trimmedLine === 'BODY:') {
-          if (currentSection && currentContent.length > 0) {
-            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
-            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
-            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
-            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
-            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
-          }
-          currentSection = 'BODY:';
-          currentContent = [];
-        } else if (trimmedLine === 'CONCLUSION:') {
-          if (currentSection && currentContent.length > 0) {
-            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
-            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
-            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
-            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
-            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
-          }
-          currentSection = 'CONCLUSION:';
-          currentContent = [];
-        } else if (trimmedLine === 'CALL TO ACTION:') {
-          if (currentSection && currentContent.length > 0) {
-            if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
-            else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
-            else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
-            else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
-            else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
-          }
-          currentSection = 'CALL TO ACTION:';
-          currentContent = [];
-        } else if (currentSection) {
-          currentContent.push(line);
         }
-      }
-      
-      // Handle the last section
-      if (currentSection && currentContent.length > 0) {
-        if (currentSection === 'META DESCRIPTION:') metaDescription = currentContent.join('\n').trim();
-        else if (currentSection === 'INTRODUCTION:') intro = currentContent.join('\n').trim();
-        else if (currentSection === 'BODY:') body = currentContent.join('\n').trim();
-        else if (currentSection === 'CONCLUSION:') conclusion = currentContent.join('\n').trim();
-        else if (currentSection === 'CALL TO ACTION:') cta = currentContent.join('\n').trim();
-      }
-
-      blogContent = {
-        title: formData.selectedTitle,
-        metaDescription: metaDescription || '',
-        intro: intro || '',
-        body: body ? body.split(/\n\n+/).filter((p: string) => p.trim()) : [],
-        conclusion: conclusion || '',
-        cta: cta || ''
-      };
-
-      // If parsing failed, create a fallback structure
-      if (!intro && !body && !conclusion) {
-        console.log('[generate-blog] Failed to parse structured format, creating fallback');
-        const paragraphs = content.split(/\n\n+/).filter((p: string) => p.trim());
-        if (paragraphs.length >= 3) {
+        
+        // Use fallback values if primary parsing failed
+        if (fallbackMetaDescription || fallbackIntro || fallbackBody || fallbackConclusion) {
+          console.log('[generate-blog] Using fallback parsing results');
           blogContent = {
-            title: formData.selectedTitle || '',
-            metaDescription: '',
-            intro: '',
-            body: paragraphs.slice(1, -1).map((p: string) => p.trim()).filter(Boolean),
-            conclusion: paragraphs[paragraphs.length - 1]?.trim() || '',
-            cta: ''
+            title: formData.selectedTitle,
+            metaDescription: fallbackMetaDescription || 'A comprehensive guide covering all aspects of the topic.',
+            intro: fallbackIntro || contentText.substring(0, 500),
+            body: fallbackBody ? fallbackBody.split(/\n\n+/).filter((p: string) => p.trim()) : [contentText],
+            conclusion: fallbackConclusion || contentText.substring(contentText.length - 300),
+            cta: fallbackCta || ''
           };
         } else {
-          // Last resort - treat entire content as body
+          // Last resort: treat entire content as body
+          console.log('[generate-blog] Using last resort parsing');
           blogContent = {
-            title: formData.selectedTitle || '',
-            metaDescription: '',
-            intro: '',
-            body: [content.trim() || ''],
-            conclusion: '',
+            title: formData.selectedTitle,
+            metaDescription: 'A comprehensive guide covering all aspects of the topic.',
+            intro: contentText.substring(0, Math.min(500, contentText.length)),
+            body: [contentText],
+            conclusion: contentText.substring(Math.max(0, contentText.length - 300)),
             cta: ''
           };
         }
+      } else {
+        blogContent = {
+          title: formData.selectedTitle,
+          metaDescription: metaDescription || 'A comprehensive guide covering all aspects of the topic.',
+          intro: intro || '',
+          body: body ? body.split(/\n\n+/).filter((p: string) => p.trim()) : [],
+          conclusion: conclusion || '',
+          cta: cta || ''
+        };
+      }
+
+      // Final check: ensure we have content in at least one section
+      if (!blogContent.intro && !blogContent.body.length && !blogContent.conclusion) {
+        console.log('[generate-blog] No content found in any section, using fallback');
+        blogContent = {
+          title: formData.selectedTitle,
+          metaDescription: 'A comprehensive guide covering all aspects of the topic.',
+          intro: contentText.substring(0, Math.min(500, contentText.length)),
+          body: [contentText],
+          conclusion: contentText.substring(Math.max(0, contentText.length - 300)),
+          cta: ''
+        };
       }
     } catch (parseError) {
       console.error('Failed to parse blog content:', parseError);
       // Create a fallback structure
       blogContent = {
         title: formData.selectedTitle || '',
-        metaDescription: '',
-        intro: '',
-        body: [content.trim() || ''],
-        conclusion: '',
+        metaDescription: 'A comprehensive guide covering all aspects of the topic.',
+        intro: content.substring(0, Math.min(500, content.length)),
+        body: [content],
+        conclusion: content.substring(Math.max(0, content.length - 300)),
         cta: ''
       };
     }
@@ -379,8 +423,24 @@ CALL TO ACTION:
     const allText = [blogContent.intro, ...(Array.isArray(blogContent.body) ? blogContent.body : [blogContent.body]), blogContent.conclusion, blogContent.cta || ''].join(' ')
     const actualWordCount = allText.split(/\s+/).filter(Boolean).length
     let tooShort = false
+    
+    console.log('[generate-blog] Word count analysis:', {
+      target: minWordCount,
+      actual: actualWordCount,
+      difference: minWordCount - actualWordCount,
+      provider: formData.apiProvider
+    });
+    
     if (minWordCount && actualWordCount < minWordCount) {
       tooShort = true
+      console.log(`[generate-blog] ⚠️ Content is too short! Target: ${minWordCount}, Actual: ${actualWordCount}, Missing: ${minWordCount - actualWordCount} words`);
+      
+      // For Together AI, if content is too short, we could potentially regenerate
+      if (formData.apiProvider === 'together' && actualWordCount < minWordCount * 0.7) {
+        console.log('[generate-blog] Content is significantly shorter than target for Together AI');
+      }
+    } else {
+      console.log(`[generate-blog] ✅ Word count target met! Target: ${minWordCount}, Actual: ${actualWordCount}`);
     }
 
     // Calculate cost for history tracking

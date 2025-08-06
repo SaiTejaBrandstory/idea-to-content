@@ -1,8 +1,9 @@
 import { useRouter } from 'next/navigation'
-import { X, User, History, Activity, MessageSquare, Users } from 'lucide-react'
+import { X, User, History, Activity, MessageSquare, Users, LogOut } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { useEffect, useState } from 'react'
+import { createClient } from '@/lib/supabase-client'
 
 interface UserSidebarProps {
   open: boolean
@@ -45,20 +46,36 @@ export default function UserSidebar({ open, onClose }: UserSidebarProps) {
     router.push('/admin/chat-history')
   }
 
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      onClose()
+      router.push('/')
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       {/* Overlay */}
       <div className="fixed inset-0 bg-black bg-opacity-30" onClick={onClose}></div>
       {/* Sidebar */}
-      <aside className="relative w-full max-w-xs bg-white h-full shadow-xl flex flex-col p-6 animate-slide-in">
-        <button
-          className="absolute top-4 right-4 text-gray-500 hover:text-black"
-          onClick={onClose}
-          aria-label="Close sidebar"
-        >
-          <X size={24} />
-        </button>
-        <nav className="mt-16 flex flex-col gap-2">
+      <aside className="relative w-full max-w-xs bg-white h-full shadow-xl flex flex-col animate-slide-in">
+        {/* Header */}
+        <div className="p-6 pb-4">
+          <button
+            className="absolute top-4 right-4 text-gray-500 hover:text-black"
+            onClick={onClose}
+            aria-label="Close sidebar"
+          >
+            <X size={24} />
+          </button>
+        </div>
+        
+        {/* Navigation */}
+        <nav className="flex-1 px-6 flex flex-col gap-2">
           <button
             className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-violet-100 text-base font-medium text-gray-800 transition"
             onClick={handleProfileClick}
@@ -105,6 +122,17 @@ export default function UserSidebar({ open, onClose }: UserSidebarProps) {
             </>
           )}
         </nav>
+
+        {/* Logout Button - Sticky Bottom */}
+        <div className="p-6 pt-4 border-t border-gray-200">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-red-50 hover:bg-red-100 text-base font-medium text-red-700 transition-colors"
+          >
+            <LogOut size={20} />
+            Sign Out
+          </button>
+        </div>
       </aside>
       <style jsx global>{`
         @keyframes slide-in {

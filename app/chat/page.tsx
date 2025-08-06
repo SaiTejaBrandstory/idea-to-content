@@ -612,128 +612,131 @@ export default function ChatPage() {
       `}</style>
       {/* Model selection and input bar (compact, sticky at bottom) */}
       <div className="sticky bottom-0 w-full bg-white border-t z-10">
-        <div className="flex flex-col sm:flex-row gap-2 items-center px-2 py-2 md:px-8 md:py-3">
+        <div className="flex flex-col gap-2 px-2 py-2 md:px-8 md:py-3">
           {/* Error and loading states */}
           {modelsError && !modelsLoading && (
             <div className="w-full text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 mb-2 text-center">
               {modelsError}
             </div>
           )}
-          {/* Provider select */}
-          <div className="w-full sm:w-64 h-10 text-xs">
-            {modelsLoading ? (
-              <div className="w-full h-10 rounded border bg-gray-100 animate-pulse shimmer" />
-            ) : (
-              <Listbox value={provider} onChange={setProvider} disabled={modelsLoading}>
-                <div className="relative h-10">
-                  <Listbox.Button className="relative w-full h-10 cursor-pointer rounded border bg-white py-1 pl-3 pr-8 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs min-w-[12rem]">
-                    <span className="block truncate">{provider.name}</span>
-                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                      <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                    </span>
-                  </Listbox.Button>
-                  <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
-                    <Listbox.Options className="absolute z-10 bottom-full right-0 origin-top-right mb-1 max-h-60 w-64 min-w-[12rem] overflow-auto rounded bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                      {PROVIDERS.map((p) => (
-                        <Listbox.Option
-                          key={p.id}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-violet-100 text-violet-900" : "text-gray-900"}`
-                          }
-                          value={p}
-                        >
-                          {({ selected }) => (
+          {/* Provider and Model selects - Top row */}
+          <div className="flex gap-2 items-center">
+            {/* Provider select */}
+            <div className="w-full sm:w-64 h-10 text-xs">
+              {modelsLoading ? (
+                <div className="w-full h-10 rounded border bg-gray-100 animate-pulse shimmer" />
+              ) : (
+                <Listbox value={provider} onChange={setProvider} disabled={modelsLoading}>
+                  <div className="relative h-10">
+                    <Listbox.Button className="relative w-full h-10 cursor-pointer rounded border bg-white py-1 pl-3 pr-8 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs min-w-[12rem]">
+                      <span className="block truncate">{provider.name}</span>
+                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                        <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                      </span>
+                    </Listbox.Button>
+                    <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+                      <Listbox.Options className="absolute z-10 bottom-full right-0 origin-top-right mb-1 max-h-60 w-64 min-w-[12rem] overflow-auto rounded bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        {PROVIDERS.map((p) => (
+                          <Listbox.Option
+                            key={p.id}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-violet-100 text-violet-900" : "text-gray-900"}`
+                            }
+                            value={p}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{p.name}</span>
+                                {selected ? (
+                                  <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
+                                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </Listbox.Option>
+                        ))}
+                      </Listbox.Options>
+                    </Transition>
+                  </div>
+                </Listbox>
+              )}
+            </div>
+            {/* Model select */}
+            <div className="w-full sm:w-64 h-10 text-xs">
+              {modelsLoading ? (
+                <div className="w-full h-10 rounded border bg-gray-100 animate-pulse shimmer" />
+              ) : (
+                <Listbox value={model} onChange={m => { setModel(m); setModelInfo(m); }} disabled={modelsLoading || featuredModels.length + regularModels.length === 0}>
+                  <div className="relative h-10">
+                    <Listbox.Button className="relative w-full h-10 cursor-pointer rounded border bg-white py-1 pl-3 pr-8 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs min-w-[12rem]">
+                      <span className="block truncate">{model ? (model.name || model.id) : "Select model"}</span>
+                      <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                        <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                      </span>
+                    </Listbox.Button>
+                    <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
+                      <Listbox.Options className="absolute z-10 bottom-full right-0 origin-top-right mb-1 max-h-60 w-64 min-w-[12rem] overflow-auto rounded bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        {featuredModels.length > 0 && (
                             <>
-                              <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{p.name}</span>
-                              {selected ? (
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
-                                  <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                                </span>
-                              ) : null}
+                              <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">Featured Models</div>
+                        {featuredModels.map((m) => (
+                          <Listbox.Option
+                            key={m.id}
+                            className={({ active }) =>
+                                    `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-violet-100 text-violet-900" : "text-gray-900"}`
+                            }
+                            value={m}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{m.name || m.id}</span>
+                                {selected ? (
+                                  <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
+                                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </Listbox.Option>
+                        ))}
                             </>
                           )}
-                        </Listbox.Option>
-                      ))}
-                    </Listbox.Options>
-                  </Transition>
-                </div>
-              </Listbox>
-            )}
+                        {regularModels.length > 0 && (
+                            <>
+                              <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">All Models</div>
+                        {regularModels.map((m) => (
+                          <Listbox.Option
+                            key={m.id}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-gray-100 text-gray-900" : "text-gray-900"}`
+                            }
+                            value={m}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{m.name || m.id}</span>
+                                {selected ? (
+                                  <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
+                                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </Listbox.Option>
+                        ))}
+                            </>
+                          )}
+                      </Listbox.Options>
+                    </Transition>
+                  </div>
+                </Listbox>
+              )}
+            </div>
           </div>
-          {/* Model select */}
-          <div className="w-full sm:w-64 h-10 text-xs">
-            {modelsLoading ? (
-              <div className="w-full h-10 rounded border bg-gray-100 animate-pulse shimmer" />
-            ) : (
-              <Listbox value={model} onChange={m => { setModel(m); setModelInfo(m); }} disabled={modelsLoading || featuredModels.length + regularModels.length === 0}>
-                <div className="relative h-10">
-                  <Listbox.Button className="relative w-full h-10 cursor-pointer rounded border bg-white py-1 pl-3 pr-8 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs min-w-[12rem]">
-                    <span className="block truncate">{model ? (model.name || model.id) : "Select model"}</span>
-                    <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                      <ChevronUpDownIcon className="h-4 w-4 text-gray-400" aria-hidden="true" />
-                    </span>
-                  </Listbox.Button>
-                  <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
-                    <Listbox.Options className="absolute z-10 bottom-full right-0 origin-top-right mb-1 max-h-60 w-64 min-w-[12rem] overflow-auto rounded bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                      {featuredModels.length > 0 && (
-                          <>
-                            <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">Featured Models</div>
-                      {featuredModels.map((m) => (
-                        <Listbox.Option
-                          key={m.id}
-                          className={({ active }) =>
-                                  `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-violet-100 text-violet-900" : "text-gray-900"}`
-                          }
-                          value={m}
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{m.name || m.id}</span>
-                              {selected ? (
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
-                                  <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                                </span>
-                              ) : null}
-                            </>
-                          )}
-                        </Listbox.Option>
-                      ))}
-                          </>
-                        )}
-                      {regularModels.length > 0 && (
-                          <>
-                            <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">All Models</div>
-                      {regularModels.map((m) => (
-                        <Listbox.Option
-                          key={m.id}
-                          className={({ active }) =>
-                            `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-gray-100 text-gray-900" : "text-gray-900"}`
-                          }
-                          value={m}
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{m.name || m.id}</span>
-                              {selected ? (
-                                <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-violet-600">
-                                  <CheckIcon className="h-4 w-4" aria-hidden="true" />
-                                </span>
-                              ) : null}
-                            </>
-                          )}
-                        </Listbox.Option>
-                      ))}
-                          </>
-                        )}
-                    </Listbox.Options>
-                  </Transition>
-                </div>
-              </Listbox>
-            )}
-          </div>
-          {/* Chat input */}
+          {/* Chat input - Bottom row */}
           <form
-            className="flex-1 flex items-end gap-2 w-full"
+            className="flex items-end gap-2 w-full"
             onSubmit={e => {
               e.preventDefault();
               handleSend();
@@ -768,8 +771,8 @@ export default function ChatPage() {
               Send
             </button>
           </form>
-          </div>
         </div>
+      </div>
       </div>
     </div>
   );

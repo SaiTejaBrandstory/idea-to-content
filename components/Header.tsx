@@ -1,17 +1,19 @@
 'use client'
 
-import { Sparkles, User, LogOut } from 'lucide-react'
+import { Sparkles, User } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import UserSidebar from './UserSidebar'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase-client'
 import React from 'react'
+import { usePathname } from 'next/navigation'
 
 export default function Header() {
-  const { user, loading, signInWithGoogle, signOut } = useAuth()
+  const { user, loading, signInWithGoogle } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [profile, setProfile] = useState<{ created_at: string; last_sign_in_at: string; is_approved: boolean; avatar_url?: string } | null>(null)
+  const pathname = usePathname()
 
   const fetchProfile = async () => {
     if (!user) return
@@ -45,18 +47,6 @@ export default function Header() {
     alert('Avatar upload not implemented yet!')
   }
 
-  const handleSignOut = async () => {
-    try {
-      await signOut()
-    } catch (error) {
-      console.error('Logout error:', error)
-      // Even if logout fails, we can still close the sidebar and clear local state
-      setSidebarOpen(false)
-      // Optionally show a toast or alert to the user
-      alert('Logout completed. If you see this message, please refresh the page.')
-    }
-  }
-
   return (
     <header className="border-b border-gray-200 bg-white sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4">
@@ -64,8 +54,12 @@ export default function Header() {
           {/* Logo and Brand */}
           <div className="flex items-center space-x-4">
             <Link href="/" className="flex items-center space-x-2 hover:opacity-80 transition-opacity">
-              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-white" />
+              <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/idea.gif" 
+                  alt="Idea to Content Logo" 
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
                 <h1 className="heading-2 gradient-text font-bold break-words text-base sm:text-lg md:text-xl lg:text-2xl leading-tight max-w-xs sm:max-w-none whitespace-normal">Idea to Content</h1>
@@ -78,15 +72,33 @@ export default function Header() {
           <nav className="hidden md:flex items-center space-x-6">
             <Link 
               href="/" 
-              className="body-text font-medium text-gray-700 hover:text-black transition-colors"
+              className={`body-text font-medium transition-colors ${
+                pathname === '/' 
+                  ? 'text-violet-700' 
+                  : 'text-black hover:text-violet-700'
+              }`}
             >
               Home
             </Link>
             <Link 
               href="/chat" 
-              className="body-text font-medium text-violet-700 hover:text-violet-900 transition-colors"
+              className={`body-text font-medium transition-colors ${
+                pathname === '/chat' 
+                  ? 'text-violet-700' 
+                  : 'text-black hover:text-violet-700'
+              }`}
             >
               AI Assistant
+            </Link>
+            <Link 
+              href="/ai-humanize" 
+              className={`body-text font-medium transition-colors ${
+                pathname === '/ai-humanize' 
+                  ? 'text-violet-700' 
+                  : 'text-black hover:text-violet-700'
+              }`}
+            >
+              AI Humanize
             </Link>
           </nav>
 
@@ -95,17 +107,6 @@ export default function Header() {
             <div className="w-16 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
           ) : user ? (
             <div className="flex items-center space-x-2">
-              <button
-                className="cssbuttons-io cssbuttons-io-small"
-                type="button"
-                onClick={handleSignOut}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <span>
-                  <LogOut size={16} style={{ marginRight: 6 }} />
-                  Logout
-                </span>
-              </button>
               <button
                 className="flex items-center justify-center rounded-full border-2 border-transparent hover:border-violet-500 transition-colors overflow-hidden"
                 style={{ width: 32, height: 32 }}

@@ -17,13 +17,21 @@ export async function POST(request: NextRequest) {
     const { text, sessionId } = await request.json();
     const apiKey = process.env.REPHRASY_API_KEY;
 
+    console.log('Humanize request:', { 
+      textLength: text?.length || 0, 
+      hasApiKey: !!apiKey,
+      sessionId 
+    });
+
     if (!apiKey) {
+      console.error('REPHRASY_API_KEY not configured');
       return NextResponse.json(
         { error: 'REPHRASY_API_KEY not configured' },
         { status: 500 }
       );
     }
 
+    console.log('Making request to Rephrasy API...');
     const response = await fetch('https://v1-humanizer.rephrasy.ai/api', {
       method: 'POST',
       headers: {
@@ -38,8 +46,11 @@ export async function POST(request: NextRequest) {
       }),
     });
 
+    console.log('Rephrasy API response status:', response.status);
+
     if (!response.ok) {
       const error = await response.text();
+      console.error('Rephrasy API error:', error);
       return NextResponse.json(
         { error: `Rephrasy API error: ${error}` },
         { status: response.status }
@@ -47,6 +58,13 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await response.json();
+    console.log('Rephrasy API response data:', {
+      hasOutput: !!data.output,
+      outputLength: data.output?.length || 0,
+      outputPreview: data.output?.substring(0, 200) + '...',
+      inputTokens: data.input_tokens,
+      outputTokens: data.output_tokens
+    });
     
     // Calculate costs from Rephrasy response
     const inputTokens = data.input_tokens || 0;
@@ -60,7 +78,7 @@ export async function POST(request: NextRequest) {
     const inputCostUsd = inputTokens * inputPricePerToken;
     const outputCostUsd = outputTokens * outputPricePerToken;
     const totalCostUsd = inputCostUsd + outputCostUsd;
-    const totalCostInr = totalCostUsd * 83; // Approximate INR conversion
+    const totalCostInr = totalCostUsd * 83;
 
     // Save to history (async, don't wait for it)
     try {
@@ -79,9 +97,9 @@ export async function POST(request: NextRequest) {
         output_cost_usd: outputCostUsd,
         total_cost_usd: totalCostUsd,
         total_cost_inr: totalCostInr,
-                      generated_content_full: data.output || '',
-              generated_content_preview: data.output?.substring(0, 500) || 'Humanized content',
-              content_length: data.output?.length || 0,
+        generated_content_full: data.output || '',
+        generated_content_preview: data.output?.substring(0, 500) || 'Humanized content',
+        content_length: data.output?.length || 0,
         setup_step: 'humanize',
         step_number: 7
       }
@@ -127,6 +145,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(data);
   } catch (error) {
+    console.error('Humanize API error:', error);
     return NextResponse.json(
       { error: 'Failed to humanize text' },
       { status: 500 }

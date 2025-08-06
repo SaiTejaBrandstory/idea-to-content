@@ -210,7 +210,7 @@ export default function BlogPreview({ content, humanizedContent, setHumanizedCon
 
   // Get the full blog text for humanization
   const getFullBlogText = () => {
-    return `${content.intro}\n\n${Array.isArray(content.body) ? content.body.join('\n\n') : content.body}\n\n${content.conclusion}`.trim();
+    return `${content.title}\n\n${content.metaDescription}\n\n${content.intro}\n\n${Array.isArray(content.body) ? content.body.join('\n\n') : content.body}\n\n${content.conclusion}${content.cta ? `\n\n${content.cta}` : ''}`.trim();
   };
 
   // Get formatted blog text with meta info
