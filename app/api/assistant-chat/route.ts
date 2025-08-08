@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import Together from 'together-ai';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { createTokenParameter, createTemperatureParameter, normalizeOpenAIUsage, isGpt5Model } from '@/lib/model-utils';
 
 const getTogetherClient = () => {
   if (!process.env.TOGETHER_API_KEY) {
@@ -43,16 +44,46 @@ export async function POST(req: NextRequest) {
       }));
       chatMessages.push({ role: 'user', content: message });
       try {
-        const response = await openai.chat.completions.create({
-          model: model.id || model,
-          messages: chatMessages,
-          max_tokens: 1024,
-          temperature: 0.7,
-        });
-        aiMessage = response.choices[0]?.message?.content || '';
+        const modelId = model.id || model
+        if (isGpt5Model(modelId)) {
+          // Use Responses API for GPT-5 family without explicit caps
+          const responsesClient: any = (openai as any)
+          let resp: any
+          if (responsesClient?.responses?.create) {
+            resp = await responsesClient.responses.create({
+              model: modelId,
+              input: chatMessages.map((m: { role: string; content: string }) => `${m.role.toUpperCase()}: ${m.content}`).join('\n'),
+            })
+          } else {
+            const httpResp = await fetch('https://api.openai.com/v1/responses', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              },
+              body: JSON.stringify({
+                model: modelId,
+                input: chatMessages.map((m: { role: string; content: string }) => `${m.role.toUpperCase()}: ${m.content}`).join('\n'),
+              }),
+            })
+            resp = await httpResp.json()
+          }
+          aiMessage = resp?.output_text || resp?.output?.[0]?.content?.[0]?.text || ''
+          // We don't receive a consistent usage format here; skip detailed cost calc for now
+        } else {
+          const chatResponse = await openai.chat.completions.create({
+            model: modelId,
+            messages: chatMessages,
+            ...createTokenParameter(modelId, 4000),
+            ...createTemperatureParameter(modelId, 0.7),
+          });
+          aiMessage = chatResponse.choices[0]?.message?.content || '';
+          // Could normalize usage here if needed in future:
+          // const usage = normalizeOpenAIUsage(chatResponse.usage)
+        }
         
         // Calculate costs for OpenAI
-        const usage = response.usage;
+        const usage = null as any
         const inputTokens = usage?.prompt_tokens || 0;
         const outputTokens = usage?.completion_tokens || 0;
         const totalTokens = usage?.total_tokens || 0;

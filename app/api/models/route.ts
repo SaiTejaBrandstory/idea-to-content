@@ -96,6 +96,7 @@ export async function GET(request: NextRequest) {
 // Helper functions for model information
 function getOpenAIModelDescription(modelId: string): string {
   const descriptions: { [key: string]: string } = {
+    'gpt-5': 'Latest GPT-5 model with advanced capabilities',
     'gpt-4o': 'Latest and most capable model',
     'gpt-4o-mini': 'Fast and efficient model',
     'gpt-3.5-turbo': 'Cost-effective option',
@@ -107,6 +108,7 @@ function getOpenAIModelDescription(modelId: string): string {
 
 function getOpenAIPricing(modelId: string): { input: number; output: number } {
   const pricing: { [key: string]: { input: number; output: number } } = {
+    'gpt-5': { input: 0.005, output: 0.015 },
     'gpt-4o': { input: 0.005, output: 0.015 },
     'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
     'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
@@ -156,6 +158,7 @@ function getTogetherPricing(modelId: string): { input: number; output: number } 
 // Fallback models if API fails
 function getFallbackOpenAIModels() {
   return [
+    { id: 'gpt-5', name: 'gpt-5', description: 'Latest GPT-5 model with advanced capabilities', provider: 'openai', pricing: { input: 0.005, output: 0.015 } },
     { id: 'gpt-4o', name: 'gpt-4o', description: 'Latest and most capable model', provider: 'openai', pricing: { input: 0.005, output: 0.015 } },
     { id: 'gpt-4o-mini', name: 'gpt-4o-mini', description: 'Fast and efficient model', provider: 'openai', pricing: { input: 0.00015, output: 0.0006 } },
     { id: 'gpt-3.5-turbo', name: 'gpt-3.5-turbo', description: 'Cost-effective option', provider: 'openai', pricing: { input: 0.0005, output: 0.0015 } }

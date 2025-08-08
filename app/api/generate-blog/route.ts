@@ -5,6 +5,7 @@ import { BlogFormData, BlogContent } from '@/types/blog'
 import { processReferences } from '@/lib/reference-processor'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { getSessionId } from '@/lib/session-manager'
+import { createTokenParameter, createTemperatureParameter, normalizeOpenAIUsage, isGpt5Model } from '@/lib/model-utils'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -186,23 +187,64 @@ CALL TO ACTION:
     if (formData.apiProvider === 'openai') {
       console.log(`[generate-blog] Using OpenAI with model: ${formData.model}`)
       try {
-        completion = await openai.chat.completions.create({
-          model: formData.model,
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
-            },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: formData.temperature,
-          max_tokens: maxTokens,
-        })
-        console.log('[generate-blog] OpenAI completion:', completion);
-        usage = completion.usage
+        const isGpt5 = isGpt5Model(formData.model)
+        if (isGpt5) {
+          // Prefer Responses API for GPT-5 family; omit explicit token/temperature caps
+          const systemInstruction = 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
+          const responsesClient: any = (openai as any)
+          let resp: any
+          if (responsesClient?.responses?.create) {
+            resp = await responsesClient.responses.create({
+              model: formData.model,
+              input: `SYSTEM: ${systemInstruction}\nUSER: ${prompt}`,
+            })
+          } else {
+            const httpResp = await fetch('https://api.openai.com/v1/responses', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              },
+              body: JSON.stringify({
+                model: formData.model,
+                input: `SYSTEM: ${systemInstruction}\nUSER: ${prompt}`,
+              }),
+            })
+            resp = await httpResp.json()
+          }
+
+          // Map to completion-like shape for downstream logic
+          completion = {
+            choices: [
+              {
+                message: {
+                  content: resp?.output_text || resp?.output?.[0]?.content?.[0]?.text || '',
+                },
+              },
+            ],
+            usage: normalizeOpenAIUsage(resp?.usage),
+          }
+          usage = completion.usage
+        } else {
+          // Use Chat Completions for non GPT-5 models, with higher token budget
+          completion = await openai.chat.completions.create({
+            model: formData.model,
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a professional content writer and SEO expert. Create high-quality, engaging blog content that provides value to readers while being optimized for search engines.'
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            ...createTemperatureParameter(formData.model, formData.temperature),
+            ...createTokenParameter(formData.model, Math.max(maxTokens, 8000)),
+          })
+          console.log('[generate-blog] OpenAI completion:', completion);
+          usage = normalizeOpenAIUsage(completion.usage)
+        }
       } catch (apiError: any) {
         console.error('[generate-blog] OpenAI API error:', apiError)
         throw new Error(`OpenAI API error: ${apiError.message || 'Unknown error'}`)
@@ -272,8 +314,8 @@ CALL TO ACTION:
               content: enhancedPrompt
             }
           ],
-          temperature: formData.temperature,
-          max_tokens: Math.max(maxTokens, 8000), // Ensure enough tokens for 1500+ words
+          ...createTemperatureParameter(formData.model, formData.temperature),
+          ...createTokenParameter(formData.model, Math.max(maxTokens, 8000)), // Ensure enough tokens for 1500+ words
         })
         usage = completion.usage
       } catch (apiError: any) {

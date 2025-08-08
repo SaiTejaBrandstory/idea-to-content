@@ -6,7 +6,10 @@ import {
   getOpenAIPricing, 
   getTogetherModelName, 
   getTogetherModelDescription, 
-  getTogetherPricing 
+  getTogetherPricing,
+  createTokenParameter,
+  createTemperatureParameter,
+  normalizeOpenAIUsage
 } from '@/lib/model-utils'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { getSessionId } from '@/lib/session-manager'
@@ -89,22 +92,69 @@ Requirements:
 
     if (apiProvider === 'openai') {
       console.log(`[generate-titles] Using OpenAI with model: ${model}`)
-      completion = await openai.chat.completions.create({
-        model: model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a professional content strategist and SEO expert. Generate compelling blog titles that are optimized for search engines and user engagement.'
-          },
-          {
-            role: 'user',
-            content: prompt
+
+      if (/gpt-5/i.test(model)) {
+        // Use Responses API by default for GPT-5 family
+        try {
+          const systemInstruction = 'You are a professional content strategist and SEO expert. Generate compelling blog titles that are optimized for search engines and user engagement.'
+          const responsesClient: any = (openai as any)
+          let resp: any
+          if (responsesClient?.responses?.create) {
+            resp = await responsesClient.responses.create({
+              model,
+              input: `SYSTEM: ${systemInstruction}\nUSER: ${prompt}`,
+            })
+          } else {
+            const httpResp = await fetch('https://api.openai.com/v1/responses', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              },
+              body: JSON.stringify({
+                model,
+                input: `SYSTEM: ${systemInstruction}\nUSER: ${prompt}`,
+                // no explicit max_output_tokens to avoid truncation
+              }),
+            })
+            resp = await httpResp.json()
           }
-        ],
-        temperature: 0.8,
-        max_tokens: 300,
-      })
-      usage = completion.usage
+
+          // Map to completion-like shape for downstream logic
+          completion = {
+            choices: [
+              {
+                message: {
+                  content: resp?.output_text || resp?.output?.[0]?.content?.[0]?.text || '',
+                },
+              },
+            ],
+            usage: normalizeOpenAIUsage(resp?.usage),
+          }
+          usage = completion.usage
+        } catch (err) {
+          console.error('[generate-titles] OpenAI Responses API error:', err)
+          completion = null
+        }
+      } else {
+        // Use standard Chat Completions for non GPT-5 models
+        completion = await openai.chat.completions.create({
+          model: model,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a professional content strategist and SEO expert. Generate compelling blog titles that are optimized for search engines and user engagement.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          ...createTemperatureParameter(model, 0.8),
+          ...createTokenParameter(model, 8000),
+        })
+        usage = normalizeOpenAIUsage(completion.usage)
+      }
     } else if (apiProvider === 'together') {
       console.log(`[generate-titles] Using Together.ai with model: ${model}`)
       const together = getTogetherClient()
@@ -120,8 +170,8 @@ Requirements:
           content: prompt
         }
       ],
-      temperature: 0.8,
-      max_tokens: 300,
+      ...createTemperatureParameter(model, 0.8),
+      ...createTokenParameter(model, 300),
     })
       usage = completion.usage
     }
@@ -130,8 +180,81 @@ Requirements:
       throw new Error(`No completion generated from ${apiProvider}`)
     }
 
-    const content = completion.choices[0]?.message?.content
+    // Try to extract text content robustly across different OpenAI model shapes
+    const extractContent = (resp: any): string => {
+      try {
+        // Standard Chat Completions
+        const direct = resp?.choices?.[0]?.message?.content
+        if (typeof direct === 'string' && direct.trim()) return direct
+        // Some SDKs may return content as an array of parts
+        const parts = resp?.choices?.[0]?.message?.content
+        if (Array.isArray(parts)) {
+          const text = parts
+            .map((p: any) => (typeof p === 'string' ? p : p?.text || ''))
+            .join('')
+            .trim()
+          if (text) return text
+        }
+        // Legacy shape
+        const legacyText = resp?.choices?.[0]?.text
+        if (typeof legacyText === 'string' && legacyText.trim()) return legacyText
+      } catch {}
+      return ''
+    }
+
+    let content = extractContent(completion)
+
+    // Fallback for newer GPT-5 family models that may require the Responses API
+    if (!content && /gpt-5/i.test(model)) {
+      try {
+        const systemInstruction = 'You are a professional content strategist and SEO expert. Generate compelling blog titles that are optimized for search engines and user engagement.'
+        const responsesClient: any = (openai as any)
+        let resp: any
+        if (responsesClient?.responses?.create) {
+          // Prefer SDK if available
+          resp = await responsesClient.responses.create({
+            model,
+            input: `SYSTEM: ${systemInstruction}\nUSER: ${prompt}`,
+            max_output_tokens: 300,
+            response_format: { type: 'text' },
+          })
+        } else {
+          // Raw HTTP fallback if SDK does not support Responses API
+          const httpResp = await fetch('https://api.openai.com/v1/responses', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model,
+              input: `SYSTEM: ${systemInstruction}\nUSER: ${prompt}`,
+              max_output_tokens: 300,
+              response_format: { type: 'text' },
+            }),
+          })
+          resp = await httpResp.json()
+        }
+        // Capture usage if provided
+        usage = usage || resp?.usage || null
+        // Extract text from Responses API
+        const outputText = resp?.output_text
+        if (typeof outputText === 'string' && outputText.trim()) {
+          content = outputText
+        } else {
+          const out = resp?.output?.[0]?.content?.[0]?.text
+          if (typeof out === 'string' && out.trim()) {
+            content = out
+          }
+        }
+      } catch (fallbackErr) {
+        console.warn('[generate-titles] Responses API fallback failed:', fallbackErr)
+      }
+    }
+
     if (!content) {
+      // As a final guard, include some diagnostics to aid debugging
+      console.warn('[generate-titles] Empty content. Completion payload:', JSON.stringify(completion, null, 2))
       throw new Error(`No content generated from ${apiProvider}`)
     }
 

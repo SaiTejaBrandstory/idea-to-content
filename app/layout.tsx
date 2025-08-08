@@ -9,6 +9,7 @@ import ConditionalFooter from '@/components/ConditionalFooter'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
   title: 'Idea to Content - AI Blog Generator',
   description: 'Generate complete blog content using AI with guided inputs and multiple formats. Create high-quality blog posts, articles, and content with advanced AI technology.',
   keywords: 'AI blog generator, content creation, blog writing, AI tools, content marketing, SEO writing',

@@ -57,3 +57,73 @@ export function getTogetherPricing(modelId: string): { input: number; output: nu
   }
   return pricing[modelId] || { input: 0.25, output: 0.35 }
 } 
+
+// Model utility functions
+
+/**
+ * Detects if a model is GPT-5 and returns the correct token parameter name
+ * GPT-5 uses 'max_completion_tokens' instead of 'max_tokens'
+ */
+export function getTokenParameter(modelId: string): 'max_tokens' | 'max_completion_tokens' {
+  // Check if the model is GPT-5 (case insensitive)
+  if (modelId.toLowerCase().includes('gpt-5') || modelId.toLowerCase().includes('gpt5')) {
+    return 'max_completion_tokens';
+  }
+  return 'max_tokens';
+}
+
+/**
+ * Creates the token parameter object for API calls
+ */
+export function createTokenParameter(modelId: string, tokenCount: number) {
+  const paramName = getTokenParameter(modelId);
+  return { [paramName]: tokenCount };
+}
+
+/**
+ * Returns true if the model id appears to be a GPT-5 family model
+ */
+export function isGpt5Model(modelId: string): boolean {
+  return /gpt-5/i.test(modelId || '')
+}
+
+/**
+ * Normalize OpenAI usage object into { prompt_tokens, completion_tokens, total_tokens }
+ * Handles both Chat Completions (prompt_tokens/completion_tokens) and
+ * Responses API (input_tokens/output_tokens) shapes.
+ */
+export function normalizeOpenAIUsage(raw: any): {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+} | null {
+  if (!raw || typeof raw !== 'object') return null
+  const prompt =
+    (typeof raw.prompt_tokens === 'number' ? raw.prompt_tokens : undefined) ??
+    (typeof raw.input_tokens === 'number' ? raw.input_tokens : undefined) ??
+    (typeof raw?.tokens?.input_tokens === 'number' ? raw.tokens.input_tokens : undefined) ??
+    0
+  const completion =
+    (typeof raw.completion_tokens === 'number' ? raw.completion_tokens : undefined) ??
+    (typeof raw.output_tokens === 'number' ? raw.output_tokens : undefined) ??
+    (typeof raw?.tokens?.output_tokens === 'number' ? raw.tokens.output_tokens : undefined) ??
+    0
+  const total =
+    (typeof raw.total_tokens === 'number' ? raw.total_tokens : undefined) ??
+    (typeof raw.tokens_used === 'number' ? raw.tokens_used : undefined) ??
+    prompt + completion
+  return { prompt_tokens: prompt, completion_tokens: completion, total_tokens: total }
+}
+
+/**
+ * Creates the temperature parameter object for API calls
+ * GPT-5 only supports temperature: 1, so we omit it for GPT-5 models
+ */
+export function createTemperatureParameter(modelId: string, temperature: number) {
+  // Check if the model is GPT-5 (case insensitive)
+  if (modelId.toLowerCase().includes('gpt-5') || modelId.toLowerCase().includes('gpt5')) {
+    // GPT-5 only supports temperature: 1, so we omit the parameter entirely
+    return {};
+  }
+  return { temperature };
+} 
