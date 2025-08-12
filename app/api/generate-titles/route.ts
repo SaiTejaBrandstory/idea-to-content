@@ -9,7 +9,8 @@ import {
   getTogetherPricing,
   createTokenParameter,
   createTemperatureParameter,
-  normalizeOpenAIUsage
+  normalizeOpenAIUsage,
+  isGpt5Model
 } from '@/lib/model-utils'
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { getSessionId } from '@/lib/session-manager'
@@ -287,6 +288,7 @@ Requirements:
       } else if (isGpt5Model(model)) {
         // GPT-5 Responses API doesn't provide usage, so we estimate
         // Estimate tokens: 1 token ≈ 4 characters for English text
+        const systemInstruction = 'You are a professional content strategist and SEO expert. Generate compelling blog titles that are optimized for search engines and user engagement.'
         const inputText = `SYSTEM: ${systemInstruction}\nUSER: ${prompt}`
         const outputText = titles.join('\n')
         
