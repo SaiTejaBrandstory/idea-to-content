@@ -32,6 +32,13 @@ export async function POST(req: NextRequest) {
     }
 
     let aiMessage = '';
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let totalTokens = 0;
+    let inputCost = 0;
+    let outputCost = 0;
+    let totalCost = 0;
+    let totalCostInr = 0;
 
     if (provider === 'openai') {
       if (!process.env.OPENAI_API_KEY) {
@@ -45,6 +52,7 @@ export async function POST(req: NextRequest) {
       chatMessages.push({ role: 'user', content: message });
       try {
         const modelId = model.id || model
+        let chatResponse: any = null;
         if (isGpt5Model(modelId)) {
           // Use Responses API for GPT-5 family without explicit caps
           const responsesClient: any = (openai as any)
@@ -71,7 +79,7 @@ export async function POST(req: NextRequest) {
           aiMessage = resp?.output_text || resp?.output?.[0]?.content?.[0]?.text || ''
           // We don't receive a consistent usage format here; skip detailed cost calc for now
         } else {
-          const chatResponse = await openai.chat.completions.create({
+          chatResponse = await openai.chat.completions.create({
             model: modelId,
             messages: chatMessages,
             ...createTokenParameter(modelId, 4000),
@@ -82,20 +90,52 @@ export async function POST(req: NextRequest) {
           // const usage = normalizeOpenAIUsage(chatResponse.usage)
         }
         
+        // Get model pricing from models API
+        let modelPricing = { input: 0.50, output: 1.50 }; // Default to GPT-3.5-turbo pricing
+        try {
+          const modelsResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/models?provider=openai`);
+          if (modelsResponse.ok) {
+            const modelsData = await modelsResponse.json();
+            const currentModel = modelsData.models?.find((m: any) => m.id === modelId);
+            if (currentModel?.pricing) {
+              modelPricing = currentModel.pricing;
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to fetch model pricing, using defaults:', error);
+        }
+        
         // Calculate costs for OpenAI
-        const usage = null as any
-        const inputTokens = usage?.prompt_tokens || 0;
-        const outputTokens = usage?.completion_tokens || 0;
-        const totalTokens = usage?.total_tokens || 0;
+        let usage: any = null;
         
-        // OpenAI pricing (per 1K tokens)
-        const inputPricePerToken = 0.005 / 1000; // $0.005 per 1K input tokens
-        const outputPricePerToken = 0.015 / 1000; // $0.015 per 1K output tokens
+        if (isGpt5Model(modelId)) {
+          // For GPT-5 Responses API, we need to estimate tokens since usage isn't provided
+          // Rough estimation: 1 token ≈ 4 characters for English text
+          const inputText = chatMessages.map((m: { role: string; content: string }) => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
+          const outputText = aiMessage;
+          
+          inputTokens = Math.ceil(inputText.length / 4);
+          outputTokens = Math.ceil(outputText.length / 4);
+          totalTokens = inputTokens + outputTokens;
+          
+          console.log(`GPT-5 token estimation: input=${inputTokens}, output=${outputTokens}, total=${totalTokens}`);
+        } else {
+          // For Chat Completions API, we get usage data
+          usage = chatResponse.usage;
+          inputTokens = usage?.prompt_tokens || 0;
+          outputTokens = usage?.completion_tokens || 0;
+          totalTokens = usage?.total_tokens || 0;
+        }
         
-        const inputCost = inputTokens * inputPricePerToken;
-        const outputCost = outputTokens * outputPricePerToken;
-        const totalCost = inputCost + outputCost;
-        const totalCostInr = totalCost * 83; // Approximate INR conversion
+        // Calculate costs using actual model pricing
+        // Pricing is per 1M tokens, so divide by 1,000,000 to get per token cost
+        const inputPricePerToken = modelPricing.input / 1000000; // Convert from per 1M to per token
+        const outputPricePerToken = modelPricing.output / 1000000;
+        
+        inputCost = inputTokens * inputPricePerToken;
+        outputCost = outputTokens * outputPricePerToken;
+        totalCost = inputCost + outputCost;
+        totalCostInr = totalCost * 83; // Approximate INR conversion
         
         // Save user message to database if sessionId is provided
         if (sessionId) {
@@ -191,34 +231,33 @@ export async function POST(req: NextRequest) {
         
         // Calculate costs for Together.ai
         const usage = response.usage;
-        const inputTokens = usage?.prompt_tokens || 0;
-        const outputTokens = usage?.completion_tokens || 0;
-        const totalTokens = usage?.total_tokens || 0;
+        inputTokens = usage?.prompt_tokens || 0;
+        outputTokens = usage?.completion_tokens || 0;
+        totalTokens = usage?.total_tokens || 0;
         
-        // Together.ai pricing (approximate - varies by model)
-        // Using more accurate pricing for Together.ai models
-        let inputPricePerToken = 0.00000014; // Default: $0.14 per 1M tokens
-        let outputPricePerToken = 0.00000028; // Default: $0.28 per 1M tokens
+        // Get real Together.ai pricing from our pricing API
+        let inputPricePerToken = 0.00000025; // Default fallback: $0.25 per 1M tokens
+        let outputPricePerToken = 0.00000035; // Default fallback: $0.35 per 1M tokens
         
-        // Adjust pricing based on model type
-        if (/llama-3-8b/i.test(togetherModelId)) {
-          inputPricePerToken = 0.0000002; // $0.20 per 1M tokens
-          outputPricePerToken = 0.0000002; // $0.20 per 1M tokens
-        } else if (/llama-3-70b/i.test(togetherModelId)) {
-          inputPricePerToken = 0.00000059; // $0.59 per 1M tokens
-          outputPricePerToken = 0.00000079; // $0.79 per 1M tokens
-        } else if (/mistral/i.test(togetherModelId)) {
-          inputPricePerToken = 0.00000014; // $0.14 per 1M tokens
-          outputPricePerToken = 0.00000042; // $0.42 per 1M tokens
-        } else if (/gemma/i.test(togetherModelId)) {
-          inputPricePerToken = 0.0000001; // $0.10 per 1M tokens
-          outputPricePerToken = 0.0000001; // $0.10 per 1M tokens
+        try {
+          const pricingResponse = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/api/pricing?provider=together&model=${encodeURIComponent(togetherModelId)}`);
+          if (pricingResponse.ok) {
+            const pricingData = await pricingResponse.json();
+            if (pricingData.pricing) {
+              // Convert from per 1M tokens to per token
+              inputPricePerToken = pricingData.pricing.input / 1000000;
+              outputPricePerToken = pricingData.pricing.output / 1000000;
+              console.log(`[cost] Together.ai real pricing for ${togetherModelId}: input=$${pricingData.pricing.input}/1M, output=$${pricingData.pricing.output}/1M`);
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to fetch Together.ai real pricing, using fallback:', error);
         }
         
-        const inputCost = inputTokens * inputPricePerToken;
-        const outputCost = outputTokens * outputPricePerToken;
-        const totalCost = inputCost + outputCost;
-        const totalCostInr = totalCost * 83; // Approximate INR conversion
+        inputCost = inputTokens * inputPricePerToken;
+        outputCost = outputTokens * outputPricePerToken;
+        totalCost = inputCost + outputCost;
+        totalCostInr = totalCost * 83; // Approximate INR conversion
         
         // Save user message to database if sessionId is provided
         if (sessionId) {
@@ -279,7 +318,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unsupported provider' }, { status: 400 });
     }
 
-    return NextResponse.json({ aiMessage });
+    return NextResponse.json({ 
+      aiMessage,
+      cost: {
+        inputTokens,
+        outputTokens,
+        totalTokens,
+        inputCost,
+        outputCost,
+        totalCost,
+        totalCostInr
+      }
+    });
   } catch (error: any) {
     console.error('Chat API error:', error);
     return NextResponse.json({ error: error.message || JSON.stringify(error) || 'Failed to get AI response' }, { status: 500 });

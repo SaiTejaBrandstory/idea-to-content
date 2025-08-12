@@ -104,9 +104,9 @@ export default function BlogPreview({ content, humanizedContent, setHumanizedCon
         inputCost = (input / 1000000) * pricing.input
         outputCost = (output / 1000000) * pricing.output
       } else {
-        // OpenAI pricing is per 1K tokens
-        inputCost = (input / 1000) * pricing.input
-        outputCost = (output / 1000) * pricing.output
+        // OpenAI pricing is per 1M tokens
+        inputCost = (input / 1000000) * pricing.input
+        outputCost = (output / 1000000) * pricing.output
       }
       
     const total = inputCost + outputCost

@@ -302,8 +302,19 @@ export default function ChatPage() {
         sender: 'ai',
         model: usedModel.name || usedModel.id,
         api: usedProvider,
-        cost: 0,
+        cost: data.cost?.totalCost || 0,
       };
+      
+      // Log cost information for debugging
+      if (data.cost) {
+        console.log('Chat cost:', {
+          inputTokens: data.cost.inputTokens,
+          outputTokens: data.cost.outputTokens,
+          totalTokens: data.cost.totalTokens,
+          totalCost: data.cost.totalCost,
+          totalCostInr: data.cost.totalCostInr
+        });
+      }
       setMessages(prev => [...prev, aiMsg]);
       
       // Refresh sessions to update costs
@@ -344,6 +355,17 @@ export default function ChatPage() {
   // Compose model dropdown options: featured first, then all others
   const featuredIds = new Set(featuredModels.map((m) => m.id));
   const regularModels = models.filter((m) => !featuredIds.has(m.id));
+  
+  // Filter GPT-5 models for the Latest Models section
+  const latestModels = models.filter((m) => 
+    m.id.toLowerCase().includes('gpt-5') || 
+    m.id.toLowerCase().includes('gpt5') ||
+    m.id.toLowerCase().includes('gpt-6') ||
+    m.id.toLowerCase().includes('gpt6')
+  );
+  
+  // Remove latest models from regular models to avoid duplication
+  const regularModelsFiltered = regularModels.filter((m) => !latestModels.some(lm => lm.id === m.id));
 
   // After all hooks, do the auth check and return null if not logged in
   if (!user && !loading) return null;
@@ -403,7 +425,9 @@ export default function ChatPage() {
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>{formatDate(session.updated_at)}</span>
-                    <span>{formatCurrency(session.total_cost_usd)}</span>
+                    <span>
+                      {formatCurrency(session.total_cost_usd)} (₹{(session.total_cost_usd * 83).toFixed(2)})
+                    </span>
                   </div>
                 </div>
               ))
@@ -490,7 +514,9 @@ export default function ChatPage() {
                   </div>
                   <div className="flex items-center justify-between text-xs text-gray-500">
                     <span>{formatDate(session.updated_at)}</span>
-                    <span>{formatCurrency(session.total_cost_usd)}</span>
+                    <span>
+                      {formatCurrency(session.total_cost_usd)} (₹{(session.total_cost_usd * 83).toFixed(2)})
+                    </span>
                   </div>
                 </div>
               ))}
@@ -518,6 +544,11 @@ export default function ChatPage() {
               <div className="mb-1">
                 <span className="font-semibold text-[11px] mr-2">{msg.sender === "user" ? "You" : "AI"}</span>
                 <span className="text-[11px] text-gray-400">[{msg.model} / {msg.api}]</span>
+                {msg.sender === "ai" && msg.cost > 0 && (
+                  <span className="text-[11px] text-green-600 ml-2">
+                    💰 ${msg.cost.toFixed(6)} (₹{(msg.cost * 83).toFixed(2)})
+                  </span>
+                )}
               </div>
               <div className="text-sm">
                 <div className="chat-markdown">
@@ -667,7 +698,7 @@ export default function ChatPage() {
               {modelsLoading ? (
                 <div className="w-full h-10 rounded border bg-gray-100 animate-pulse shimmer" />
               ) : (
-                <Listbox value={model} onChange={m => { setModel(m); setModelInfo(m); }} disabled={modelsLoading || featuredModels.length + regularModels.length === 0}>
+                <Listbox value={model} onChange={m => { setModel(m); setModelInfo(m); }} disabled={modelsLoading || featuredModels.length + latestModels.length + regularModelsFiltered.length === 0}>
                   <div className="relative h-10">
                     <Listbox.Button className="relative w-full h-10 cursor-pointer rounded border bg-white py-1 pl-3 pr-8 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-xs min-w-[12rem]">
                       <span className="block truncate">{model ? (model.name || model.id) : "Select model"}</span>
@@ -677,6 +708,31 @@ export default function ChatPage() {
                     </Listbox.Button>
                     <Transition as={Fragment} leave="transition ease-in duration-100" leaveFrom="opacity-100" leaveTo="opacity-0">
                       <Listbox.Options className="absolute z-10 bottom-full right-0 origin-top-right mb-1 max-h-60 w-64 min-w-[12rem] overflow-auto rounded bg-white py-1 text-xs shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        {latestModels.length > 0 && (
+                            <>
+                              <div className="px-3 py-1 text-xs font-semibold text-blue-600 bg-blue-50">🚀 Latest Models (GPT-5)</div>
+                        {latestModels.map((m) => (
+                          <Listbox.Option
+                            key={m.id}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-1 pl-8 pr-4 ${active ? "bg-blue-100 text-blue-900" : "text-gray-900"}`
+                            }
+                            value={m}
+                          >
+                            {({ selected }) => (
+                              <>
+                                <span className={`block truncate ${selected ? "font-medium" : "font-normal"}`}>{m.name || m.id}</span>
+                                {selected ? (
+                                  <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-blue-600">
+                                    <CheckIcon className="h-4 w-4" aria-hidden="true" />
+                                  </span>
+                                ) : null}
+                              </>
+                            )}
+                          </Listbox.Option>
+                        ))}
+                            </>
+                          )}
                         {featuredModels.length > 0 && (
                             <>
                               <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">Featured Models</div>
@@ -702,10 +758,10 @@ export default function ChatPage() {
                         ))}
                             </>
                           )}
-                        {regularModels.length > 0 && (
+                        {regularModelsFiltered.length > 0 && (
                             <>
                               <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">All Models</div>
-                        {regularModels.map((m) => (
+                        {regularModelsFiltered.map((m) => (
                           <Listbox.Option
                             key={m.id}
                             className={({ active }) =>

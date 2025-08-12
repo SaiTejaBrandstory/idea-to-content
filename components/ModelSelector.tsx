@@ -26,9 +26,9 @@ export default function ModelSelector({ formData, updateFormData }: ModelSelecto
   }, [formData.apiProvider])
 
   const fetchModels = async (provider: string) => {
-    setLoading(true)
-    setError('')
-    
+        setLoading(true)
+        setError('')
+
     try {
       console.log(`Fetching models for provider: ${provider}`)
       const response = await fetch(`/api/models?provider=${provider}`)
@@ -48,7 +48,7 @@ export default function ModelSelector({ formData, updateFormData }: ModelSelecto
         const currentModelExists = data.models.some((model: ModelInfo) => model.id === formData.model)
         if (!currentModelExists) {
           const firstModel = data.models[0]
-          updateFormData({ 
+          updateFormData({
             model: firstModel.id,
             selectedModel: firstModel
           })
@@ -64,25 +64,25 @@ export default function ModelSelector({ formData, updateFormData }: ModelSelecto
       console.log(`Loaded ${data.models.length} models for ${provider}`)
     } catch (error) {
       console.error('Error fetching models:', error)
-      setError('Failed to load models. Please try again.')
-    } finally {
-      setLoading(false)
+        setError('Failed to load models. Please try again.')
+      } finally {
+        setLoading(false)
+      }
     }
-  }
 
   const selectModel = (model: ModelInfo) => {
-    updateFormData({ 
+    updateFormData({
       model: model.id,
       selectedModel: model
     })
     console.log(`Selected model: ${model.name} (${model.id})`)
   }
 
-  const calculateCost = (model: ModelInfo, inputTokens: number = 1000, outputTokens: number = 1000) => {
-    const inputCost = (inputTokens / 1000) * model.pricing.input
-    const outputCost = (outputTokens / 1000) * model.pricing.output
-    const total = inputCost + outputCost
-    return total > 0 ? `$${total.toFixed(6)}` : '$0.000000'
+  const calculateCost = (model: ModelInfo) => {
+    // Display input/output rates per 1M tokens (like official OpenAI pricing)
+    const inputRate = model.pricing.input
+    const outputRate = model.pricing.output
+    return `$${inputRate.toFixed(2)}/$${outputRate.toFixed(2)} per 1M tokens`
   }
 
   const getUsageLabel = (type: string) => {
@@ -195,6 +195,71 @@ export default function ModelSelector({ formData, updateFormData }: ModelSelecto
       {/* Models Grid */}
       {!loading && filteredModels.length > 0 && (
         <div className="space-y-6">
+          {/* Latest Models (GPT-5 Series) */}
+          {(() => {
+            const gpt5Models = filteredModels.filter(model => 
+              model.id.toLowerCase().includes('gpt-5') || 
+              model.id.toLowerCase().includes('gpt5')
+            );
+            return gpt5Models.length > 0 ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="heading-3 text-black flex items-center">
+                    <span className="text-purple-500 mr-2">🚀</span>
+                    Latest Models ({gpt5Models.length})
+                  </h3>
+                    <span className="text-xs text-purple-500 bg-purple-100 px-2 py-1 rounded-full font-semibold">
+                      GPT-5 Series
+                    </span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {gpt5Models.map((model) => (
+                    <div
+                      key={model.id}
+                      className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 hover-lift ${
+                        formData.model === model.id
+                          ? 'border-purple-500 bg-purple-50 shadow-uber'
+                          : 'border-purple-200 hover:border-purple-300 bg-purple-50'
+                      }`}
+                      onClick={() => selectModel(model)}
+                    >
+                      <div className="space-y-3">
+                        {/* Model Name and Description */}
+                        <div>
+                          <div className="font-semibold text-black mb-1 text-sm flex items-center">
+                            {model.name}
+                            <span className="text-purple-500 ml-1">🚀</span>
+                          </div>
+                          {model.description && <div className="text-xs text-gray-600">{model.description}</div>}
+                        </div>
+                        {/* Author and Type */}
+                        <div className="flex items-center text-xs text-gray-500 gap-2">
+                          {model.author && <span>By {model.author}</span>}
+                          {model.type && <span className="px-2 py-0.5 bg-purple-100 rounded-full text-purple-700 font-semibold">{getUsageLabel(model.type)}</span>}
+                        </div>
+                        {/* Pricing Info */}
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center text-gray-500">
+                            <DollarSign className="w-3 h-3 mr-1" />
+                            <span>{calculateCost(model)}</span>
+                          </div>
+                          {formData.model === model.id && (
+                            <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                          )}
+                        </div>
+                        {/* Model ID (small) */}
+                        <div className="text-xs text-gray-400 font-mono">
+                          {model.id}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
+
           {/* Featured Models */}
           {filteredFeaturedModels.length > 0 && (
             <div className="space-y-4">
@@ -237,7 +302,7 @@ export default function ModelSelector({ formData, updateFormData }: ModelSelecto
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center text-gray-500">
                           <DollarSign className="w-3 h-3 mr-1" />
-                          <span>~{calculateCost(model)} per 1K tokens</span>
+                          <span>{calculateCost(model)}</span>
                         </div>
                         {formData.model === model.id && (
                           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -256,24 +321,24 @@ export default function ModelSelector({ formData, updateFormData }: ModelSelecto
 
           {/* All Other Models */}
           {regularModels.length > 0 && (
-            <div className="space-y-4">
+      <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="heading-3 text-black">
+          <h3 className="heading-3 text-black">
                   All Models ({regularModels.length})
-                </h3>
-              </div>
-              
+          </h3>
+        </div>
+        
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {regularModels.map((model) => (
-                  <div
-                    key={model.id}
-                    className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 hover-lift ${
+            <div
+              key={model.id}
+              className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 hover-lift ${
                       formData.model === model.id
-                        ? 'border-blue-500 bg-blue-50 shadow-uber'
-                        : 'border-gray-200 hover:border-gray-300 bg-white'
-                    }`}
-                    onClick={() => selectModel(model)}
-                  >
+                  ? 'border-blue-500 bg-blue-50 shadow-uber'
+                  : 'border-gray-200 hover:border-gray-300 bg-white'
+              }`}
+              onClick={() => selectModel(model)}
+            >
                     <div className="space-y-3">
                       {/* Model Name and Description */}
                       <div>
@@ -289,21 +354,21 @@ export default function ModelSelector({ formData, updateFormData }: ModelSelecto
                       <div className="flex items-center justify-between text-xs">
                         <div className="flex items-center text-gray-500">
                           <DollarSign className="w-3 h-3 mr-1" />
-                          <span>~{calculateCost(model)} per 1K tokens</span>
+                          <span>{calculateCost(model)}</span>
                         </div>
                         {formData.model === model.id && (
                           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        )}
-                      </div>
+                    )}
+                  </div>
                       {/* Model ID (small) */}
                       <div className="text-xs text-gray-400 font-mono">
                         {model.id}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                </div>
               </div>
             </div>
+          ))}
+        </div>
+      </div>
           )}
         </div>
       )}
@@ -317,8 +382,8 @@ export default function ModelSelector({ formData, updateFormData }: ModelSelecto
               <h4 className="font-semibold text-black mb-1 text-sm">Selected Model</h4>
               <p className="text-sm text-gray-700 mb-2">{formData.selectedModel.name}</p>
               <div className="text-xs text-gray-600">
-                <div>Input: ${formData.selectedModel.pricing.input}/1K tokens</div>
-                <div>Output: ${formData.selectedModel.pricing.output}/1K tokens</div>
+                <div>Input: ${formData.selectedModel.pricing.input}/1M tokens</div>
+                <div>Output: ${formData.selectedModel.pricing.output}/1M tokens</div>
               </div>
             </div>
           </div>

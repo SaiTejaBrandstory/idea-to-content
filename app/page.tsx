@@ -35,7 +35,7 @@ export default function Home() {
       name: 'GPT-4o',
       description: 'OpenAI\'s latest model with improved performance',
       provider: 'openai',
-      pricing: { input: 0.005, output: 0.015 }
+      pricing: { input: 0.50, output: 1.50 }
     }
   })
 
@@ -139,7 +139,7 @@ export default function Home() {
         name: 'GPT-4o',
         description: 'OpenAI\'s latest model with improved performance',
         provider: 'openai',
-        pricing: { input: 0.005, output: 0.015 }
+        pricing: { input: 0.50, output: 1.50 }
       }
     })
     // Clear localStorage

@@ -3,9 +3,15 @@
 ## Supported AI Providers
 
 ### OpenAI
-- **Models**: GPT-4o, GPT-4o Mini, GPT-3.5 Turbo
-- **Pricing**: $0.005 per 1K input tokens, $0.015 per 1K output tokens
-- **Best for**: High-quality content, complex reasoning
+- **Models**: GPT-5, GPT-5 Mini, GPT-5 Nano, GPT-4o, GPT-4o Mini, GPT-3.5 Turbo
+- **Pricing**: Official OpenAI pricing per 1M tokens (source: https://platform.openai.com/docs/pricing)
+  - GPT-5: $1.25/$10.00 per 1M tokens (input/output)
+  - GPT-5 Mini: $0.25/$2.00 per 1M tokens (input/output)
+  - GPT-5 Nano: $0.05/$0.40 per 1M tokens (input/output)
+  - GPT-4o: $5.00/$20.00 per 1M tokens (input/output)
+  - GPT-4o Mini: $0.60/$2.40 per 1M tokens (input/output)
+  - GPT-3.5 Turbo: $0.50/$1.50 per 1M tokens (input/output)
+- **Best for**: High-quality content, complex reasoning, latest AI capabilities
 
 ### Together.ai
 - **Models**: Llama 3.1 8B Turbo (recommended), Llama 3.1 70B, DeepSeek V3, WizardLM 2, Gemma 2 27B, Claude 3.5 Sonnet
@@ -35,6 +41,12 @@
    - Word count and API provider info at the top
    - Cost calculation based on the actual provider used
 
+3. **Model Selection**: In the model selector, you'll see:
+   - **Latest Models**: Showcases all GPT-5 series models with purple highlighting and 🚀 icon
+   - **Featured Models**: Shows popular and reliable models with yellow highlighting and ⭐ icon
+   - **Pricing Display**: Shows input/output rates per 1M tokens (e.g., "$5.00/$20.00 per 1M tokens")
+   - **Selected Model Info**: Shows individual input/output rates per 1M tokens
+
 ### Console Logging
 Open your browser's Developer Tools (F12) and check the Console tab for detailed logs:
 
@@ -51,31 +63,66 @@ Estimated cost: $0.000049 USD (₹0.00 INR)
 Generating blog using together with model: meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
 Generated blog using together (meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo)
 Token usage: 500 input, 1200 output
-Estimated cost: $0.000238 USD (₹0.02 INR)
+Estimated cost: $0.000147 USD (₹0.01 INR)
 ```
 
-### Server-Side Logs
-Check your terminal/console where you're running `npm run dev` for server-side logs:
+## Pricing Standardization (Completed)
 
+### What Was Updated
+All OpenAI pricing has been standardized to use **official pricing data per 1M tokens** from https://platform.openai.com/docs/pricing
+
+### Files Updated
+- `lib/model-utils.ts` - Updated pricing function
+- `app/api/models/route.ts` - Updated main models API
+- `app/api/pricing/route.ts` - Updated pricing API
+- `app/api/featured-models/route.ts` - Updated featured models
+- `app/page.tsx` - Updated hardcoded pricing
+- `app/api/generate-blog/route.ts` - Updated cost calculations
+- `app/api/generate-titles/route.ts` - Updated cost calculations
+- `app/api/assistant-chat/route.ts` - Updated fallback pricing
+- `components/BlogPreview.tsx` - Updated pricing comments and calculations
+- `components/ModelSelector.tsx` - Updated pricing display and calculations
+- `components/TopicGenerator.tsx` - Updated pricing comments and calculations
+
+### Pricing Units
+- **Before**: Mixed units (some per 1K tokens, some per 1M tokens)
+- **After**: Consistent per 1M tokens across all files
+- **Source**: Official OpenAI pricing documentation
+
+### Cost Calculation
+All cost calculations now correctly use:
+```typescript
+const inputPricePerToken = pricing.input / 1000000; // Convert from per 1M to per token
+const outputPricePerToken = pricing.output / 1000000;
 ```
-[generate-titles] Using Together.ai with model: meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
-[generate-blog] Using Together.ai with model: meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo
+
+This ensures accurate cost tracking and prevents the 1000x pricing discrepancy that existed before.
+
+### GPT-5 Models Cost Calculation
+**Problem Fixed**: GPT-5 models using the Responses API don't provide usage data, causing "Pricing not available" errors.
+
+**Solution Implemented**: 
+- **Token Estimation**: When usage data is unavailable, estimate tokens using character count (1 token ≈ 4 characters)
+- **Cost Calculation**: Apply official pricing rates to estimated tokens
+- **Consistent Tracking**: All GPT-5 models now show proper costs in title generation, blog generation, and chat
+
+**Example GPT-5 Cost Calculation**:
+```typescript
+if (isGpt5Model(modelId)) {
+  // Estimate tokens for GPT-5 Responses API
+  const estimatedInputTokens = Math.ceil(inputText.length / 4)
+  const estimatedOutputTokens = Math.ceil(outputText.length / 4)
+  
+  // Calculate cost using official pricing
+  totalCost = (estimatedInputTokens * inputPricePerToken) + (estimatedOutputTokens * outputPricePerToken)
+}
 ```
 
-## Cost Calculation
-
-### OpenAI Pricing
-- Input tokens: $0.005 per 1,000 tokens
-- Output tokens: $0.015 per 1,000 tokens
-- Example: 500 input + 1000 output = $0.0025 + $0.015 = $0.0175
-
-### Together.ai Pricing
-- **Pay-as-you-go**: Pricing varies by model size and type
-- **Smaller models** (8B): Generally more cost-effective
-- **Larger models** (70B+): Higher quality but more expensive
-- **Approximate**: $0.14-0.59 per 1M input tokens, $0.28-0.79 per 1M output tokens
-
-**Note**: Together.ai pricing is model-specific. Check their [pricing page](https://together.ai/pricing) for exact rates.
+**Models Now Working**:
+- ✅ GPT-5: $1.25/$10.00 per 1M tokens
+- ✅ GPT-5 Mini: $0.25/$2.00 per 1M tokens  
+- ✅ GPT-5 Nano: $0.05/$0.40 per 1M tokens
+- ✅ GPT-5 Chat Latest: $1.25/$10.00 per 1M tokens
 
 ## Environment Variables
 

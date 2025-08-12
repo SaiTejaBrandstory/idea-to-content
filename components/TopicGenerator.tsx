@@ -65,10 +65,10 @@ export default function TopicGenerator({ formData, updateFormData, generatedTitl
         outputCost = (output / 1000000) * pricing.output
         console.log(`[cost] Using per_1M_tokens calculation`)
       } else {
-        // OpenAI pricing is per 1K tokens
-        inputCost = (input / 1000) * pricing.input
-        outputCost = (output / 1000) * pricing.output
-        console.log(`[cost] Using per_1K_tokens calculation`)
+        // OpenAI pricing is per 1M tokens
+        inputCost = (input / 1000000) * pricing.input
+        outputCost = (output / 1000000) * pricing.output
+        console.log(`[cost] Using per_1M_tokens calculation`)
       }
       
       console.log(`[cost] Calculated costs: input=${inputCost}, output=${outputCost}`)
@@ -220,10 +220,10 @@ export default function TopicGenerator({ formData, updateFormData, generatedTitl
             {formData.selectedModel && (
               <div className="text-right">
                 <p className="text-xs text-gray-500">
-                  ${formData.selectedModel.pricing.input}/{formData.selectedModel.provider === 'together' ? '1M' : '1K'} input
+                  ${formData.selectedModel.pricing.input}/1M input
                 </p>
                 <p className="text-xs text-gray-500">
-                  ${formData.selectedModel.pricing.output}/{formData.selectedModel.provider === 'together' ? '1M' : '1K'} output
+                  ${formData.selectedModel.pricing.output}/1M output
                 </p>
               </div>
             )}

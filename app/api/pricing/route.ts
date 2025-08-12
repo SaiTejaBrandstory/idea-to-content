@@ -36,13 +36,35 @@ export async function GET(request: NextRequest) {
 
     if (provider === 'openai') {
       // OpenAI does not provide pricing via API, so we use their published pricing
-      // This is the only exception to the no-hardcoded rule
+      // Official OpenAI pricing per 1M tokens (as of August 2025)
+      // Source: https://platform.openai.com/docs/pricing
       const openaiPricing: { [key: string]: { input: number; output: number } } = {
-        'gpt-4o': { input: 0.005, output: 0.015 },
-        'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
-        'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
-        'gpt-4': { input: 0.03, output: 0.06 },
-        'gpt-4-turbo': { input: 0.01, output: 0.03 }
+        // === GPT-5 Series (Current) ===
+        'gpt-5': { input: 1.25, output: 10.00 },
+        'gpt-5-mini': { input: 0.25, output: 2.00 },
+        'gpt-5-nano': { input: 0.05, output: 0.40 },
+        'gpt-5-chat-latest': { input: 1.25, output: 10.00 },
+        
+        // === GPT-4.1 Series Fine-Tuning ===
+        'gpt-4.1': { input: 3.00, output: 12.00 },
+        'gpt-4.1-mini': { input: 0.80, output: 3.20 },
+        'gpt-4.1-nano': { input: 0.20, output: 0.80 },
+        
+        // === GPT-4o Series (Current multimodal) ===
+        'gpt-4o': { input: 5.00, output: 20.00 },
+        'gpt-4o-mini': { input: 0.60, output: 2.40 },
+        'gpt-4o-audio': { input: 40.00, output: 80.00 },
+        'gpt-4o-mini-audio': { input: 10.00, output: 20.00 },
+        
+        // === Reasoning Models ===
+        'o1-pro': { input: 150.00, output: 600.00 },
+        'o3-pro': { input: 20.00, output: 80.00 },
+        
+        // === Legacy Models ===
+        'gpt-4': { input: 30.00, output: 60.00 },
+        'gpt-4-turbo': { input: 10.00, output: 30.00 },
+        'gpt-4.5': { input: 75.00, output: 150.00 },
+        'gpt-3.5-turbo': { input: 0.50, output: 1.50 }
       }
       pricing = openaiPricing[model] || null
       if (!pricing) {
@@ -55,7 +77,7 @@ export async function GET(request: NextRequest) {
         pricing,
         provider,
         model,
-        units: 'per_1K_tokens'
+        units: 'per_1M_tokens'
       })
     } else if (provider === 'together') {
       if (!process.env.TOGETHER_API_KEY) {

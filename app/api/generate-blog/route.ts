@@ -490,24 +490,49 @@ CALL TO ACTION:
     let totalCostInr = 0
     let inputPricePerToken = 0
     let outputPricePerToken = 0
-    let pricingUnits = 'per_1K_tokens'
+    let pricingUnits = 'per_1M_tokens'
 
-    if (usage) {
-      if (formData.apiProvider === 'openai') {
-        const pricing = formData.selectedModel?.pricing || { input: 0.005, output: 0.015 }
-        inputPricePerToken = pricing.input / 1000
-        outputPricePerToken = pricing.output / 1000
-        pricingUnits = 'per_1K_tokens'
-        totalCostUsd = (usage.prompt_tokens * pricing.input / 1000) + (usage.completion_tokens * pricing.output / 1000)
-      } else {
-        const pricing = formData.selectedModel?.pricing || { input: 0.25, output: 0.35 }
-        inputPricePerToken = pricing.input / 1000000
-        outputPricePerToken = pricing.output / 1000000
-        pricingUnits = 'per_1M_tokens'
-        totalCostUsd = (usage.prompt_tokens * pricing.input / 1000000) + (usage.completion_tokens * pricing.output / 1000000)
+    if (formData.apiProvider === 'openai') {
+      const pricing = formData.selectedModel?.pricing || { input: 0.50, output: 1.50 } // Default to GPT-3.5-turbo pricing
+      inputPricePerToken = pricing.input / 1000000 // Convert from per 1M to per token
+      outputPricePerToken = pricing.output / 1000000 // Convert from per 1M to per token
+      pricingUnits = 'per_1M_tokens'
+      
+      if (usage) {
+        // Standard Chat Completions API with usage data
+        totalCostUsd = (usage.prompt_tokens * inputPricePerToken) + (usage.completion_tokens * outputPricePerToken)
+      } else if (isGpt5Model(formData.model)) {
+        // GPT-5 Responses API doesn't provide usage, so we estimate
+        // Estimate tokens: 1 token ≈ 4 characters for English text
+        const inputText = JSON.stringify(formData) // Approximate input size
+        const outputText = JSON.stringify(blogContent) // Actual output size
+        
+        const estimatedInputTokens = Math.ceil(inputText.length / 4)
+        const estimatedOutputTokens = Math.ceil(outputText.length / 4)
+        
+        totalCostUsd = (estimatedInputTokens * inputPricePerToken) + (estimatedOutputTokens * outputPricePerToken)
+        
+        // Create estimated usage object for consistency
+        usage = {
+          prompt_tokens: estimatedInputTokens,
+          completion_tokens: estimatedOutputTokens,
+          total_tokens: estimatedInputTokens + estimatedOutputTokens
+        }
+        
+        console.log(`[generate-blog] GPT-5 token estimation: input=${estimatedInputTokens}, output=${estimatedOutputTokens}, total=${estimatedInputTokens + estimatedOutputTokens}`)
       }
-      totalCostInr = totalCostUsd * 83
+    } else if (formData.apiProvider === 'together') {
+      const pricing = formData.selectedModel?.pricing || { input: 0.25, output: 0.35 }
+      inputPricePerToken = pricing.input / 1000000
+      outputPricePerToken = pricing.output / 1000000
+      pricingUnits = 'per_1M_tokens'
+      
+      if (usage) {
+        totalCostUsd = (usage.prompt_tokens * inputPricePerToken) + (usage.completion_tokens * outputPricePerToken)
+      }
     }
+    
+    totalCostInr = totalCostUsd * 83
 
     // Save to history (async, don't wait for it)
     try {
