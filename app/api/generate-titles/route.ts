@@ -78,13 +78,31 @@ export async function POST(request: NextRequest) {
     // Tone-specific instruction
     const toneInstruction = tone ? `The writing tone should be ${tone.subtype} (${tone.type}).` : ''
 
-    const prompt = `Generate 5 engaging, SEO-friendly blog titles for a ${blogType} blog post using these keywords: ${keywords.join(', ')}. ${typeInstruction} ${toneInstruction}
+    const prompt = `Generate 5 COMPLETELY DIFFERENT and creative blog titles for a ${blogType} blog post using these keywords: ${keywords.join(', ')}. ${typeInstruction} ${toneInstruction}
 
-Requirements:
-- Each title should be compelling and click-worthy
-- Include the main keywords naturally
+🚨 CRITICAL REQUIREMENTS:
+- Each title must be UNIQUE and DIFFERENT from the others
+- NO repetitive patterns or formulas
+- NO generic templates like "X: A Comprehensive Guide" or "X: Step-by-Step for Beginners"
+- Create diverse title styles: questions, statements, lists, benefits, etc.
+- Include the main keywords naturally but creatively
 - Keep titles under 60 characters
-- Return only the titles, one per line`
+- Make each title compelling and click-worthy in its own way
+
+🚨 FORBIDDEN PATTERNS:
+- "X: A Comprehensive Guide"
+- "X: Step-by-Step for Beginners" 
+- "X: Core Techniques"
+- "X: Essential Guide"
+- Any repetitive formulaic structure
+
+🚨 REQUIRED:
+- 5 completely different title styles
+- Creative and engaging approaches
+- Natural keyword integration
+- Variety in tone and structure
+
+Return only the titles, one per line.`
 
     console.log('[generate-titles] FINAL PROMPT:', prompt)
 
@@ -97,7 +115,7 @@ Requirements:
       if (/gpt-5/i.test(model)) {
         // Use Responses API by default for GPT-5 family
         try {
-          const systemInstruction = 'You are a professional content strategist and SEO expert. Generate compelling blog titles that are optimized for search engines and user engagement.'
+          const systemInstruction = 'You are a creative content strategist and SEO expert. Your job is to generate COMPLETELY DIFFERENT and creative blog titles. Avoid repetitive patterns, formulas, or generic templates. Each title should be unique in style, approach, and structure. Think outside the box and create engaging titles that stand out from each other.'
           const responsesClient: any = (openai as any)
           let resp: any
           if (responsesClient?.responses?.create) {
@@ -144,7 +162,7 @@ Requirements:
           messages: [
             {
               role: 'system',
-              content: 'You are a professional content strategist and SEO expert. Generate compelling blog titles that are optimized for search engines and user engagement.'
+              content: 'You are a creative content strategist and SEO expert. Your job is to generate COMPLETELY DIFFERENT and creative blog titles. Avoid repetitive patterns, formulas, or generic templates. Each title should be unique in style, approach, and structure. Think outside the box and create engaging titles that stand out from each other.'
             },
             {
               role: 'user',
@@ -164,7 +182,7 @@ Requirements:
       messages: [
         {
           role: 'system',
-          content: 'You are a professional content strategist and SEO expert. Generate compelling blog titles that are optimized for search engines and user engagement.'
+          content: 'You are a creative content strategist and SEO expert. Your job is to generate COMPLETELY DIFFERENT and creative blog titles. Avoid repetitive patterns, formulas, or generic templates. Each title should be unique in style, approach, and structure. Think outside the box and create engaging titles that stand out from each other.'
         },
         {
           role: 'user',

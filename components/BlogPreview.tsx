@@ -26,7 +26,8 @@ interface BlogPreviewProps {
 const markdownComponents = {
   h1: ({node, ...props}: any) => <h1 className="text-2xl font-bold mb-4 text-black" {...props} />,
   h2: ({node, ...props}: any) => <h2 className="text-xl font-bold mt-8 mb-3 text-gray-900" {...props} />,
-  h3: ({node, ...props}: any) => <h3 className="text-base font-bold mt-6 mb-2 text-gray-800" {...props} />,
+  h3: ({node, ...props}: any) => <h3 className="text-lg font-bold mt-6 mb-2 text-gray-800" {...props} />,
+  h4: ({node, ...props}: any) => <h4 className="text-base font-bold mt-4 mb-2 text-gray-700" {...props} />,
   p: ({node, ...props}: any) => <p className="text-base text-gray-900 leading-relaxed mb-3" {...props} />,
   ul: ({node, ...props}: any) => <ul className="list-disc ml-6 mb-3" {...props} />,
   ol: ({node, ...props}: any) => <ol className="list-decimal ml-6 mb-3" {...props} />,
@@ -75,6 +76,12 @@ export default function BlogPreview({ content, humanizedContent, setHumanizedCon
     const allText = [content.intro, ...(Array.isArray(content.body) ? content.body : [content.body]), content.conclusion, content.cta || ''].join(' ')
     return allText.split(/\s+/).filter(Boolean).length
   }, [content])
+
+  // Calculate word count for humanized content
+  const humanizedWordCount = useMemo(() => {
+    if (!humanizedContent?.output) return 0
+    return humanizedContent.output.split(/\s+/).filter(Boolean).length
+  }, [humanizedContent])
 
   // Cost calculation using real API pricing and usage data
   const getCost = async (usage?: { prompt_tokens?: number; completion_tokens?: number }, provider?: string, model?: string, selectedModel?: ModelInfo) => {
@@ -302,13 +309,16 @@ export default function BlogPreview({ content, humanizedContent, setHumanizedCon
         <div className="mt-8 pt-8 border-t-2 border-gray-100">
           <div className="flex items-center gap-4 mb-4">
             <h2 className="text-lg font-semibold text-blue-900">Humanized Version</h2>
-            <div className="flex items-center gap-2">
-              <div className="text-sm text-gray-600">Flesch Score:</div>
-              <div className="flex items-center gap-1">
-                <div className={`w-2 h-2 rounded-full ${getFleschScoreColor(humanizedContent.new_flesch_score)}`}></div>
-                <div className="text-sm font-medium">{humanizedContent.new_flesch_score.toFixed(1)}</div>
-                <div className="text-xs text-gray-500">({getFleschScoreLabel(humanizedContent.new_flesch_score)})</div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="text-sm text-gray-600">Flesch Score:</div>
+                <div className="flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${getFleschScoreColor(humanizedContent.new_flesch_score)}`}></div>
+                  <div className="text-sm font-medium">{humanizedContent.new_flesch_score.toFixed(1)}</div>
+                  <div className="text-xs text-gray-500">({getFleschScoreLabel(humanizedContent.new_flesch_score)})</div>
+                </div>
               </div>
+              <div className="text-sm text-gray-600">Word count: {humanizedWordCount}</div>
             </div>
           </div>
           

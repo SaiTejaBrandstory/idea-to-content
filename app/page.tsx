@@ -42,6 +42,7 @@ export default function Home() {
   const [generatedContent, setGeneratedContent] = useState<BlogContent | null>(null)
   const [humanizedContent, setHumanizedContent] = useState<{ output: string; new_flesch_score: number } | null>(null)
   const [generatedTitles, setGeneratedTitles] = useState<string[]>([])
+  const [contentStructure, setContentStructure] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
   const [isContentGenerated, setIsContentGenerated] = useState(false)
@@ -114,6 +115,7 @@ export default function Home() {
     setGeneratedContent(null)
     setHumanizedContent(null)
     setGeneratedTitles([])
+    setContentStructure(null)
     setIsContentGenerated(false)
     setCurrentStep(1)
     setFormData({
@@ -155,6 +157,7 @@ export default function Home() {
     // Clear generated titles if keywords change
     if (updates.keywords && updates.keywords.length !== formData.keywords.length) {
       setGeneratedTitlesPersistent([])
+      setContentStructure(null)
     }
   }
 
@@ -193,6 +196,7 @@ export default function Home() {
         },
         body: JSON.stringify({
           ...formData,
+          contentStructure,
           sessionId: currentSessionId
         }),
       })
@@ -399,6 +403,8 @@ export default function Home() {
                         currentSessionId={currentSessionId}
                         sessionSteps={sessionSteps}
                         setSessionSteps={setSessionSteps}
+                        contentStructure={contentStructure}
+                        setContentStructure={setContentStructure}
                       />
                     )}
                   </div>
